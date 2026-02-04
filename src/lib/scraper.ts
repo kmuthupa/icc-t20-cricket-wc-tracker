@@ -2,32 +2,45 @@ import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { TeamStanding, Match } from './mockData'
 
-const ESPN_BASE = 'https://www.espncricinfo.com'
+const CRICBUZZ_BASE = 'https://www.cricbuzz.com'
+const SERIES_ID = '11253'
+const SERIES_SLUG = 'icc-mens-t20-world-cup-2026'
+
+const headers = {
+  'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+  'Accept-Language': 'en-US,en;q=0.5',
+}
 
 export async function scrapeStandings(): Promise<TeamStanding[] | null> {
   try {
-    const url = `${ESPN_BASE}/series/icc-men-s-t20-world-cup-2026-1473541/points-table-standings`
-    const { data } = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-      },
-      timeout: 10000,
-    })
+    const url = `${CRICBUZZ_BASE}/cricket-series/${SERIES_ID}/${SERIES_SLUG}/points-table`
+    const { data } = await axios.get(url, { headers, timeout: 15000 })
     
     const $ = cheerio.load(data)
     const standings: TeamStanding[] = []
+    let position = 0
     
-    $('table tbody tr').each((index, row) => {
-      const cells = $(row).find('td')
-      if (cells.length >= 7) {
+    $('.point-table-grid').each((index, row) => {
+      const text = $(row).text().trim().replace(/\s+/g, ' ')
+      
+      // Skip header rows (contain "Group" or column headers)
+      if (text.includes('Group') || text.includes('PWL') || text.includes('NRPts')) {
+        return
+      }
+      
+      // Parse team row: "1IND 000000.000" or similar
+      const match = text.match(/^(\d+)([A-Z]+)\s+(\d+)(\d+)(\d+)(\d+)(\d+)([-+]?\d+\.\d+)$/)
+      if (match) {
+        position++
         standings.push({
-          position: index + 1,
-          team: $(cells[0]).text().trim(),
-          played: parseInt($(cells[1]).text().trim()) || 0,
-          won: parseInt($(cells[2]).text().trim()) || 0,
-          lost: parseInt($(cells[3]).text().trim()) || 0,
-          nrr: $(cells[5]).text().trim() || '0.00',
-          points: parseInt($(cells[6]).text().trim()) || 0,
+          position,
+          team: expandTeamName(match[2]),
+          played: parseInt(match[3]) || 0,
+          won: parseInt(match[4]) || 0,
+          lost: parseInt(match[5]) || 0,
+          nrr: match[8],
+          points: parseInt(match[7]) || 0,
         })
       }
     })
@@ -41,69 +54,91 @@ export async function scrapeStandings(): Promise<TeamStanding[] | null> {
 
 export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match[] } | null> {
   try {
-    const url = `${ESPN_BASE}/series/icc-men-s-t20-world-cup-2026-1473541/match-schedule-fixtures`
-    const { data } = await axios.get(url, {
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-      },
-      timeout: 10000,
-    })
+    const url = `${CRICBUZZ_BASE}/cricket-series/${SERIES_ID}/${SERIES_SLUG}/matches`
+    const { data } = await axios.get(url, { headers, timeout: 15000 })
     
     const $ = cheerio.load(data)
     const today: Match[] = []
     const upcoming: Match[] = []
-    const now = new Date()
-    const todayStr = now.toDateString()
     
-    $('.ds-p-4').each((index, matchCard) => {
-      const teams = $(matchCard).find('.ci-team-score')
-      if (teams.length >= 2) {
-        const team1El = $(teams[0])
-        const team2El = $(teams[1])
-        
-        const team1 = team1El.find('.ds-text-tight-m').text().trim()
-        const team2 = team2El.find('.ds-text-tight-m').text().trim()
-        const team1Score = team1El.find('.ds-text-compact-s').text().trim()
-        const team2Score = team2El.find('.ds-text-compact-s').text().trim()
-        
-        const statusEl = $(matchCard).find('.ds-text-tight-xs')
-        const statusText = statusEl.text().trim().toLowerCase()
-        const venueEl = $(matchCard).find('.ds-text-tight-s')
-        const venue = venueEl.first().text().trim()
-        
-        let status: 'completed' | 'live' | 'upcoming' = 'upcoming'
-        let result = ''
-        
-        if (statusText.includes('won') || statusText.includes('tied')) {
-          status = 'completed'
-          result = statusEl.text().trim()
-        } else if (statusText.includes('live') || statusText.includes('innings')) {
-          status = 'live'
-        }
-        
-        const match: Match = {
-          id: `match-${index}`,
-          team1: team1 || 'TBD',
-          team2: team2 || 'TBD',
-          team1Score: team1Score || undefined,
-          team2Score: team2Score || undefined,
-          result: result || undefined,
-          venue: venue || 'TBD',
-          time: '',
-          status,
-        }
-        
-        if (status === 'completed' || status === 'live') {
-          today.push(match)
-        } else {
-          upcoming.push(match)
-        }
+    $('a[href*="/live-cricket-scores/"]').each((index, el) => {
+      const title = $(el).attr('title') || ''
+      const href = $(el).attr('href') || ''
+      
+      // Only include T20 WC matches
+      if (!href.includes(SERIES_SLUG) && !title.toLowerCase().includes('t20 world cup 2026')) {
+        return
+      }
+      
+      // Parse title: "Team1 vs Team2, Match Info - Status"
+      const titleMatch = title.match(/^(.+?)\s+vs\s+(.+?),\s*(.+?)\s*-\s*(.+)$/)
+      if (!titleMatch) return
+      
+      const [, team1, team2, matchInfo, statusText] = titleMatch
+      const status = parseStatus(statusText.trim())
+      
+      const match: Match = {
+        id: `match-${index}`,
+        team1: team1.trim(),
+        team2: team2.trim(),
+        venue: matchInfo.trim(),
+        time: '',
+        status,
+        result: status === 'completed' ? statusText.trim() : undefined,
+      }
+      
+      if (status === 'completed' || status === 'live') {
+        if (today.length < 5) today.push(match)
+      } else {
+        if (upcoming.length < 6) upcoming.push(match)
       }
     })
     
-    return { today: today.slice(0, 5), upcoming: upcoming.slice(0, 6) }
+    return { today, upcoming }
   } catch (error) {
     console.error('Failed to scrape matches:', error)
     return null
   }
+}
+
+function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
+  const lower = text.toLowerCase()
+  if (lower.includes('won') || lower.includes('tied') || lower.includes('complete') || lower.includes('drawn')) {
+    return 'completed'
+  }
+  if (lower.includes('live') || lower.includes('innings') || lower.includes('break')) {
+    return 'live'
+  }
+  return 'upcoming'
+}
+
+function expandTeamName(abbr: string): string {
+  const teams: Record<string, string> = {
+    'IND': 'India',
+    'AUS': 'Australia',
+    'ENG': 'England',
+    'PAK': 'Pakistan',
+    'SA': 'South Africa',
+    'NZ': 'New Zealand',
+    'WI': 'West Indies',
+    'SL': 'Sri Lanka',
+    'BAN': 'Bangladesh',
+    'AFG': 'Afghanistan',
+    'ZIM': 'Zimbabwe',
+    'IRE': 'Ireland',
+    'SCO': 'Scotland',
+    'NAM': 'Namibia',
+    'NED': 'Netherlands',
+    'NEP': 'Nepal',
+    'USA': 'USA',
+    'UAE': 'UAE',
+    'OMAN': 'Oman',
+    'ITA': 'Italy',
+    'PNG': 'Papua New Guinea',
+    'CAN': 'Canada',
+    'HK': 'Hong Kong',
+    'KEN': 'Kenya',
+    'UGA': 'Uganda',
+  }
+  return teams[abbr] || abbr
 }
