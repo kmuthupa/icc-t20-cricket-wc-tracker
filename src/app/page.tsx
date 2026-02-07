@@ -103,13 +103,13 @@ export default function Home() {
               data?.todayMatches.map((match) => (
                 <div key={match.id} className="match-item">
                   <div className="match-teams">
-                    {match.team1} vs {match.team2}
+                    <span>{match.team1} vs {match.team2}</span>
                     {match.status === 'live' && <span className="status-live">LIVE</span>}
                   </div>
                   {match.team1Score && (
-                    <div className="match-details">
+                    <div className="match-score">
                       {match.team1}: {match.team1Score}
-                      {match.team2Score && <> | {match.team2}: {match.team2Score}</>}
+                      {match.team2Score && <> · {match.team2}: {match.team2Score}</>}
                     </div>
                   )}
                   {match.result && <div className="match-result">{match.result}</div>}
