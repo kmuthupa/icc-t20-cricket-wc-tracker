@@ -8,6 +8,11 @@ export interface TeamStanding {
   points: number
 }
 
+export interface GroupStandings {
+  group: string
+  teams: TeamStanding[]
+}
+
 export interface Match {
   id: string
   team1: string
@@ -20,15 +25,47 @@ export interface Match {
   status: 'completed' | 'live' | 'upcoming'
 }
 
-export const mockStandings: TeamStanding[] = [
-  { position: 1, team: 'India', played: 3, won: 3, lost: 0, nrr: '+1.85', points: 6 },
-  { position: 2, team: 'Australia', played: 3, won: 2, lost: 1, nrr: '+1.20', points: 4 },
-  { position: 3, team: 'England', played: 3, won: 2, lost: 1, nrr: '+0.65', points: 4 },
-  { position: 4, team: 'South Africa', played: 3, won: 2, lost: 1, nrr: '+0.42', points: 4 },
-  { position: 5, team: 'Pakistan', played: 3, won: 1, lost: 2, nrr: '-0.35', points: 2 },
-  { position: 6, team: 'New Zealand', played: 3, won: 1, lost: 2, nrr: '-0.58', points: 2 },
-  { position: 7, team: 'West Indies', played: 3, won: 1, lost: 2, nrr: '-0.92', points: 2 },
-  { position: 8, team: 'Sri Lanka', played: 3, won: 0, lost: 3, nrr: '-1.45', points: 0 },
+export const mockStandings: GroupStandings[] = [
+  {
+    group: 'Group A',
+    teams: [
+      { position: 1, team: 'India', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 2, team: 'Pakistan', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 3, team: 'USA', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 4, team: 'Netherlands', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 5, team: 'Namibia', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+    ]
+  },
+  {
+    group: 'Group B',
+    teams: [
+      { position: 1, team: 'Australia', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 2, team: 'Sri Lanka', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 3, team: 'Zimbabwe', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 4, team: 'Ireland', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 5, team: 'Oman', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+    ]
+  },
+  {
+    group: 'Group C',
+    teams: [
+      { position: 1, team: 'England', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 2, team: 'West Indies', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 3, team: 'Scotland', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 4, team: 'Nepal', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 5, team: 'Italy', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+    ]
+  },
+  {
+    group: 'Group D',
+    teams: [
+      { position: 1, team: 'South Africa', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 2, team: 'New Zealand', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 3, team: 'Afghanistan', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 4, team: 'UAE', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 5, team: 'Canada', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+    ]
+  },
 ]
 
 export const mockTodayMatches: Match[] = [

@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { TeamStanding, Match } from '@/lib/mockData'
+import { GroupStandings, Match } from '@/lib/mockData'
 
 interface CricketData {
-  standings: TeamStanding[]
+  standings: GroupStandings[]
   todayMatches: Match[]
   upcomingMatches: Match[]
   usingMockData: boolean
@@ -60,40 +60,42 @@ export default function Home() {
       )}
 
       <div className="grid">
-        <div className="card full-width">
-          <div className="card-header">Points Table</div>
-          <div className="card-body">
-            <table>
-              <thead>
-                <tr>
-                  <th>#</th>
-                  <th>Team</th>
-                  <th className="text-center">P</th>
-                  <th className="text-center">W</th>
-                  <th className="text-center">L</th>
-                  <th className="text-right">NRR</th>
-                  <th className="text-right">Pts</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data?.standings.map((team) => (
-                  <tr key={team.position}>
-                    <td>{team.position}</td>
-                    <td>{team.team}</td>
-                    <td className="text-center">{team.played}</td>
-                    <td className="text-center">{team.won}</td>
-                    <td className="text-center">{team.lost}</td>
-                    <td className="text-right">{team.nrr}</td>
-                    <td className="text-right"><strong>{team.points}</strong></td>
+        {data?.standings.map((group) => (
+          <div key={group.group} className="card">
+            <div className="card-header">{group.group}</div>
+            <div className="card-body">
+              <table>
+                <thead>
+                  <tr>
+                    <th>#</th>
+                    <th>Team</th>
+                    <th className="text-center">P</th>
+                    <th className="text-center">W</th>
+                    <th className="text-center">L</th>
+                    <th className="text-right">NRR</th>
+                    <th className="text-right">Pts</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {group.teams.map((team) => (
+                    <tr key={`${group.group}-${team.position}`}>
+                      <td>{team.position}</td>
+                      <td>{team.team}</td>
+                      <td className="text-center">{team.played}</td>
+                      <td className="text-center">{team.won}</td>
+                      <td className="text-center">{team.lost}</td>
+                      <td className="text-right">{team.nrr}</td>
+                      <td className="text-right"><strong>{team.points}</strong></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        ))}
 
         <div className="card">
-          <div className="card-header">Today's Matches</div>
+          <div className="card-header">Today&apos;s Matches</div>
           <div className="card-body">
             {data?.todayMatches.length === 0 ? (
               <p className="text-center" style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>

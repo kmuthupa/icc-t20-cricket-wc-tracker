@@ -1,6 +1,6 @@
 import axios from 'axios'
 import * as cheerio from 'cheerio'
-import { TeamStanding, Match } from './mockData'
+import { TeamStanding, GroupStandings, Match } from './mockData'
 
 const CRICBUZZ_BASE = 'https://www.cricbuzz.com'
 const SERIES_ID = '11253'
@@ -12,40 +12,59 @@ const headers = {
   'Accept-Language': 'en-US,en;q=0.5',
 }
 
-export async function scrapeStandings(): Promise<TeamStanding[] | null> {
+export async function scrapeStandings(): Promise<GroupStandings[] | null> {
   try {
     const url = `${CRICBUZZ_BASE}/cricket-series/${SERIES_ID}/${SERIES_SLUG}/points-table`
     const { data } = await axios.get(url, { headers, timeout: 15000 })
     
     const $ = cheerio.load(data)
-    const standings: TeamStanding[] = []
-    let position = 0
+    const groups: GroupStandings[] = []
+    let currentGroupName = ''
+    let currentTeams: TeamStanding[] = []
     
-    $('.point-table-grid').each((index, row) => {
+    $('.point-table-grid').each((_, row) => {
       const text = $(row).text().trim().replace(/\s+/g, ' ')
       
-      // Skip header rows (contain "Group" or column headers)
-      if (text.includes('Group') || text.includes('PWL') || text.includes('NRPts')) {
+      // Check for group header
+      const groupMatch = text.match(/^(Group [A-D]|SUPER 8 G\d)/)
+      if (groupMatch) {
+        if (currentGroupName && currentTeams.length > 0) {
+          groups.push({ group: currentGroupName, teams: currentTeams })
+        }
+        currentGroupName = groupMatch[1]
+        currentTeams = []
         return
       }
       
-      // Parse team row: "1IND 000000.000" or similar
-      const match = text.match(/^(\d+)([A-Z]+)\s+(\d+)(\d+)(\d+)(\d+)(\d+)([-+]?\d+\.\d+)$/)
-      if (match) {
-        position++
-        standings.push({
-          position,
-          team: expandTeamName(match[2]),
-          played: parseInt(match[3]) || 0,
-          won: parseInt(match[4]) || 0,
-          lost: parseInt(match[5]) || 0,
-          nrr: match[8],
-          points: parseInt(match[7]) || 0,
+      // Skip column headers
+      if (text.includes('PWL') || text.includes('NRPts') || text.includes('Pre-Seeding')) {
+        return
+      }
+      
+      // Parse team row: "1IND 000000.000" or "1PAK 11002+0.240"
+      const teamMatch = text.match(/^(\d+)([A-Z]+)\s+(\d)(\d)(\d)(\d)(\d)([-+]?\d+\.\d+)$/)
+      if (teamMatch && currentGroupName) {
+        currentTeams.push({
+          position: parseInt(teamMatch[1]),
+          team: expandTeamName(teamMatch[2]),
+          played: parseInt(teamMatch[3]) || 0,
+          won: parseInt(teamMatch[4]) || 0,
+          lost: parseInt(teamMatch[5]) || 0,
+          nrr: teamMatch[8],
+          points: parseInt(teamMatch[7]) || 0,
         })
       }
     })
     
-    return standings.length > 0 ? standings : null
+    // Push the last group
+    if (currentGroupName && currentTeams.length > 0) {
+      groups.push({ group: currentGroupName, teams: currentTeams })
+    }
+    
+    // Only return Group A-D for now (skip Super 8 pre-seeding)
+    const mainGroups = groups.filter(g => g.group.startsWith('Group'))
+    
+    return mainGroups.length > 0 ? mainGroups : null
   } catch (error) {
     console.error('Failed to scrape standings:', error)
     return null
