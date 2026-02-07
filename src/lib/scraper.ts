@@ -61,6 +61,7 @@ export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match
     const today: Match[] = []
     const upcoming: Match[] = []
     const seenHrefs = new Set<string>()
+    const liveMatchUrls: { match: Match, href: string }[] = []
     
     $('a[href*="/live-cricket-scores/"]').each((index, el) => {
       const title = $(el).attr('title') || ''
@@ -93,15 +94,73 @@ export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match
       }
       
       if (status === 'completed' || status === 'live') {
-        if (today.length < 5) today.push(match)
+        if (today.length < 5) {
+          today.push(match)
+          if (status === 'live') {
+            liveMatchUrls.push({ match, href })
+          }
+        }
       } else {
         if (upcoming.length < 6) upcoming.push(match)
       }
     })
     
+    // Fetch scores for live matches
+    await Promise.all(liveMatchUrls.map(async ({ match, href }) => {
+      try {
+        const scores = await scrapeMatchScore(href)
+        if (scores) {
+          match.team1Score = scores.team1Score
+          match.team2Score = scores.team2Score
+        }
+      } catch (e) {
+        console.error('Failed to fetch score for', href, e)
+      }
+    }))
+    
     return { today, upcoming }
   } catch (error) {
     console.error('Failed to scrape matches:', error)
+    return null
+  }
+}
+
+async function scrapeMatchScore(href: string): Promise<{ team1Score?: string, team2Score?: string } | null> {
+  try {
+    const url = `${CRICBUZZ_BASE}${href}`
+    const { data } = await axios.get(url, { headers, timeout: 10000 })
+    const $ = cheerio.load(data)
+    
+    const scores: { team1Score?: string, team2Score?: string } = {}
+    
+    // Find score pattern like "IND118-7(16.4)" or "USA 45-2 (6.3)"
+    $('div').each((i, el) => {
+      const text = $(el).clone().children().remove().end().text().trim()
+      // Match patterns like "118-7(16.4)" or "45/2 (6.3)"
+      const scoreMatch = text.match(/^(\d+)[-/](\d+)\s*\((\d+\.?\d*)\)$/)
+      if (scoreMatch && !scores.team1Score) {
+        scores.team1Score = `${scoreMatch[1]}/${scoreMatch[2]} (${scoreMatch[3]})`
+      }
+    })
+    
+    // Also try to find full team score text
+    $('div').each((i, el) => {
+      const text = $(el).text().trim().replace(/\s+/g, '')
+      // Match "IND118-7(16.4)" pattern
+      const fullMatch = text.match(/^([A-Z]{2,4})(\d+)[-/](\d+)\((\d+\.?\d*)\)/)
+      if (fullMatch) {
+        const score = `${fullMatch[2]}/${fullMatch[3]} (${fullMatch[4]})`
+        if (!scores.team1Score) {
+          scores.team1Score = score
+        } else if (!scores.team2Score && score !== scores.team1Score) {
+          scores.team2Score = score
+        }
+      }
+    })
+    
+    return scores.team1Score ? scores : null
+  } catch (error) {
+    console.error('Failed to scrape match score:', error)
     return null
   }
 }
