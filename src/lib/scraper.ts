@@ -108,10 +108,12 @@ export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match
 
 function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
   const lower = text.toLowerCase()
-  if (lower.includes('won') || lower.includes('tied') || lower.includes('complete') || lower.includes('drawn')) {
+  if (lower.includes('won') || lower.includes('tied') || lower.includes('complete') || lower.includes('drawn') || lower.includes('no result')) {
     return 'completed'
   }
-  if (lower.includes('live') || lower.includes('innings') || lower.includes('break')) {
+  if (lower.includes('live') || lower.includes('innings') || lower.includes('break') || 
+      lower.includes('opt to') || lower.includes('elected to') || lower.includes('batting') ||
+      lower.includes('bowling') || lower.includes('target') || lower.includes('need')) {
     return 'live'
   }
   return 'upcoming'
