@@ -186,10 +186,15 @@ async function scrapeMatchScore(href: string): Promise<{ team1Score?: string, te
 
 function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
   const lower = text.toLowerCase()
-  if (lower.includes('won') || lower.includes('tied') || lower.includes('complete') || lower.includes('drawn') || lower.includes('no result')) {
+  if (lower.includes('won') || lower.includes('tied') || lower.includes('complete') ||
+      lower.includes('drawn') || lower.includes('no result') || lower.includes('abandoned') ||
+      lower.includes('cancelled') || lower.includes('beat') || lower.includes('defeated') ||
+      lower.includes('washed out') || lower.includes('washout') || lower.includes('forfeit') ||
+      lower.includes('awarded') || lower.includes('dls') || lower.includes('d/l') ||
+      /\bmatch over\b/.test(lower)) {
     return 'completed'
   }
-  if (lower.includes('live') || lower.includes('innings') || lower.includes('break') || 
+  if (lower.includes('live') || lower.includes('innings') || lower.includes('break') ||
       lower.includes('opt to') || lower.includes('elected to') || lower.includes('batting') ||
       lower.includes('bowling') || lower.includes('target') || lower.includes('need')) {
     return 'live'
