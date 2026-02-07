@@ -60,10 +60,15 @@ export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match
     const $ = cheerio.load(data)
     const today: Match[] = []
     const upcoming: Match[] = []
+    const seenHrefs = new Set<string>()
     
     $('a[href*="/live-cricket-scores/"]').each((index, el) => {
       const title = $(el).attr('title') || ''
       const href = $(el).attr('href') || ''
+      
+      // Skip duplicates
+      if (seenHrefs.has(href)) return
+      seenHrefs.add(href)
       
       // Only include T20 WC matches
       if (!href.includes(SERIES_SLUG) && !title.toLowerCase().includes('t20 world cup 2026')) {
