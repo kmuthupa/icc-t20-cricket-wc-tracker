@@ -41,8 +41,8 @@ export async function scrapeStandings(): Promise<GroupStandings[] | null> {
         return
       }
       
-      // Parse team row: "1IND 000000.000" or "1PAK 11002+0.240"
-      const teamMatch = text.match(/^(\d+)([A-Z]+)\s+(\d)(\d)(\d)(\d)(\d)([-+]?\d+\.\d+)$/)
+      // Parse team row: "1IND 000000.000" or "1PAK 11002+0.240" or "1IND (Q)33006+3.050"
+      const teamMatch = text.match(/^(\d+)([A-Z]+)\s+(?:\([A-Z]\))?(\d)(\d)(\d)(\d)(\d)([-+]?\d+\.\d+)$/)
       if (teamMatch && currentGroupName) {
         currentTeams.push({
           position: parseInt(teamMatch[1]),
@@ -209,6 +209,7 @@ function expandTeamName(abbr: string): string {
     'ENG': 'England',
     'PAK': 'Pakistan',
     'SA': 'South Africa',
+    'RSA': 'South Africa',
     'NZ': 'New Zealand',
     'WI': 'West Indies',
     'SL': 'Sri Lanka',
