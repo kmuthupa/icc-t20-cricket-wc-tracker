@@ -129,8 +129,14 @@ export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match
       try {
         const scores = await scrapeMatchScore(href)
         if (scores) {
-          match.team1Score = scores.team1Score
-          match.team2Score = scores.team2Score
+          for (const { team, score } of scores) {
+            const expanded = expandTeamName(team)
+            if (expanded === match.team1 || team === match.team1) {
+              match.team1Score = score
+            } else if (expanded === match.team2 || team === match.team2) {
+              match.team2Score = score
+            }
+          }
         }
       } catch (e) {
         console.error('Failed to fetch score for', href, e)
@@ -144,47 +150,38 @@ export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match
   }
 }
 
-async function scrapeMatchScore(href: string): Promise<{ team1Score?: string, team2Score?: string } | null> {
+export async function scrapeMatchScore(href: string): Promise<{ team: string, score: string }[] | null> {
   try {
     const url = `${CRICBUZZ_BASE}${href}`
     const { data } = await axios.get(url, { headers, timeout: 10000 })
     const $ = cheerio.load(data)
-    
-    const scores: { team1Score?: string, team2Score?: string } = {}
-    
-    // Find score pattern like "IND118-7(16.4)" or "USA 45-2 (6.3)"
-    $('div').each((i, el) => {
-      const text = $(el).clone().children().remove().end().text().trim()
-      // Match patterns like "118-7(16.4)" or "45/2 (6.3)"
-      const scoreMatch = text.match(/^(\d+)[-/](\d+)\s*\((\d+\.?\d*)\)$/)
-      if (scoreMatch && !scores.team1Score) {
-        scores.team1Score = `${scoreMatch[1]}/${scoreMatch[2]} (${scoreMatch[3]})`
-      }
-    })
-    
-    // Also try to find full team score text
-    $('div').each((i, el) => {
+
+    const scores: { team: string, score: string }[] = []
+    const seen = new Set<string>()
+
+    // Find "TEAM+score" patterns like "IND118-7(16.4)" or "SL97-1(10.4)"
+    $('div').each((_, el) => {
       const text = $(el).text().trim().replace(/\s+/g, '')
-      // Match "IND118-7(16.4)" pattern
       const fullMatch = text.match(/^([A-Z]{2,4})(\d+)[-/](\d+)\((\d+\.?\d*)\)/)
       if (fullMatch) {
+        const team = fullMatch[1]
         const score = `${fullMatch[2]}/${fullMatch[3]} (${fullMatch[4]})`
-        if (!scores.team1Score) {
-          scores.team1Score = score
-        } else if (!scores.team2Score && score !== scores.team1Score) {
-          scores.team2Score = score
+        const key = `${team}-${score}`
+        if (!seen.has(key)) {
+          seen.add(key)
+          scores.push({ team, score })
         }
       }
     })
-    
-    return scores.team1Score ? scores : null
+
+    return scores.length > 0 ? scores : null
   } catch (error) {
     console.error('Failed to scrape match score:', error)
     return null
   }
 }
 
-function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
+export function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
   const lower = text.toLowerCase()
   if (lower.includes('won') || lower.includes('tied') || lower.includes('complete') ||
       lower.includes('drawn') || lower.includes('no result') || lower.includes('abandoned') ||
@@ -202,7 +199,7 @@ function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
   return 'upcoming'
 }
 
-function expandTeamName(abbr: string): string {
+export function expandTeamName(abbr: string): string {
   const teams: Record<string, string> = {
     'IND': 'India',
     'AUS': 'Australia',
