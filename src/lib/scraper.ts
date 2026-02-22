@@ -26,7 +26,7 @@ export async function scrapeStandings(): Promise<GroupStandings[] | null> {
       const text = $(row).text().trim().replace(/\s+/g, ' ')
       
       // Check for group header
-      const groupMatch = text.match(/^(Group [A-D]|SUPER 8 G\d)/)
+      const groupMatch = text.match(/^(Group [A-D]|Super 8 Group \d)/)
       if (groupMatch) {
         if (currentGroupName && currentTeams.length > 0) {
           groups.push({ group: currentGroupName, teams: currentTeams })
@@ -61,8 +61,8 @@ export async function scrapeStandings(): Promise<GroupStandings[] | null> {
       groups.push({ group: currentGroupName, teams: currentTeams })
     }
     
-    // Only return Group A-D for now (skip Super 8 pre-seeding)
-    const mainGroups = groups.filter(g => g.group.startsWith('Group'))
+    // Return Super 8 groups (active stage) and Group A-D (completed stage)
+    const mainGroups = groups.filter(g => g.group.startsWith('Group') || g.group.startsWith('Super 8'))
     
     return mainGroups.length > 0 ? mainGroups : null
   } catch (error) {

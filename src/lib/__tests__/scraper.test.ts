@@ -76,58 +76,74 @@ describe('parseStatus', () => {
 describe('scrapeStandings', () => {
   beforeEach(() => jest.clearAllMocks())
 
+  // Reflects current Cricbuzz structure: Super 8 first, then completed Group Stage
   const buildPointsTableHTML = () => `
     <html><body>
-      <div class="point-table-grid">Group A</div>
-      <div class="point-table-grid">P W L T NR Pts NRR</div>
-      <div class="point-table-grid">1IND 33006+3.050</div>
+      <div class="point-table-grid">Super 8 Group 1PWLNRPtsNRR</div>
+      <div class="point-table-grid">1WI 11002+1.820</div>
+      <div class="point-table-grid">2IND 000000.000</div>
+      <div class="point-table-grid">3ZIM 000000.000</div>
+      <div class="point-table-grid">4RSA 000000.000</div>
+
+      <div class="point-table-grid">Super 8 Group 2PWLNRPtsNRR</div>
+      <div class="point-table-grid">1ENG 11002+2.550</div>
+      <div class="point-table-grid">2PAK 100110.000</div>
+      <div class="point-table-grid">3NZ 100110.000</div>
+      <div class="point-table-grid">4SL 10100-2.550</div>
+
+      <div class="point-table-grid">Group APWLNRPtsNRR</div>
+      <div class="point-table-grid">1IND (Q)33006+3.050</div>
       <div class="point-table-grid">2PAK (Q)22004+1.200</div>
       <div class="point-table-grid">3USA 31202-0.500</div>
       <div class="point-table-grid">4NED 30300-1.800</div>
       <div class="point-table-grid">5NAM 30300-2.100</div>
 
-      <div class="point-table-grid">Group B</div>
-      <div class="point-table-grid">P W L T NR Pts NRR</div>
+      <div class="point-table-grid">Group BPWLNRPtsNRR</div>
       <div class="point-table-grid">1AUS 33006+2.100</div>
       <div class="point-table-grid">2SL 32104+0.800</div>
       <div class="point-table-grid">3ZIM 31202-0.300</div>
       <div class="point-table-grid">4IRE 30300-1.200</div>
       <div class="point-table-grid">5OMAN 30300-1.500</div>
 
-      <div class="point-table-grid">Group C</div>
-      <div class="point-table-grid">P W L T NR Pts NRR</div>
+      <div class="point-table-grid">Group CPWLNRPtsNRR</div>
       <div class="point-table-grid">1ENG (Q)33006+1.900</div>
       <div class="point-table-grid">2WI 32104+0.500</div>
       <div class="point-table-grid">3SCO 31202-0.200</div>
       <div class="point-table-grid">4NEP 30300-0.900</div>
       <div class="point-table-grid">5ITA 30300-1.400</div>
 
-      <div class="point-table-grid">Group D</div>
-      <div class="point-table-grid">P W L T NR Pts NRR</div>
-      <div class="point-table-grid">1SA 33006+2.500</div>
+      <div class="point-table-grid">Group DPWLNRPtsNRR</div>
+      <div class="point-table-grid">1RSA 33006+2.500</div>
       <div class="point-table-grid">2NZ (E)32104+0.600</div>
       <div class="point-table-grid">3AFG 31202-0.100</div>
       <div class="point-table-grid">4UAE 30300-1.000</div>
       <div class="point-table-grid">5CAN 30300-1.600</div>
-
-      <div class="point-table-grid">SUPER 8 G1 Pre-Seeding</div>
-      <div class="point-table-grid">1IND 000000.000</div>
     </body></html>
   `
 
-  it('parses all 4 groups with correct team data', async () => {
+  it('parses Super 8 and Group Stage groups in page order', async () => {
     mockedAxios.get.mockResolvedValueOnce({ data: buildPointsTableHTML() })
 
     const result = await scrapeStandings()
     expect(result).not.toBeNull()
-    expect(result).toHaveLength(4)
-    expect(result![0].group).toBe('Group A')
-    expect(result![1].group).toBe('Group B')
-    expect(result![2].group).toBe('Group C')
-    expect(result![3].group).toBe('Group D')
+    expect(result).toHaveLength(6)
+    expect(result![0].group).toBe('Super 8 Group 1')
+    expect(result![1].group).toBe('Super 8 Group 2')
+    expect(result![2].group).toBe('Group A')
+    expect(result![3].group).toBe('Group B')
+    expect(result![4].group).toBe('Group C')
+    expect(result![5].group).toBe('Group D')
 
-    // Verify team details
-    const india = result![0].teams[0]
+    // Verify Super 8 team details
+    const wi = result![0].teams[0]
+    expect(wi.team).toBe('West Indies')
+    expect(wi.played).toBe(1)
+    expect(wi.won).toBe(1)
+    expect(wi.points).toBe(2)
+    expect(wi.nrr).toBe('+1.820')
+
+    // Verify Group Stage team details
+    const india = result![2].teams[0]
     expect(india.team).toBe('India')
     expect(india.played).toBe(3)
     expect(india.won).toBe(3)
@@ -140,20 +156,41 @@ describe('scrapeStandings', () => {
     mockedAxios.get.mockResolvedValueOnce({ data: buildPointsTableHTML() })
 
     const result = await scrapeStandings()
-    // PAK with (Q) should still parse
-    const pak = result![0].teams[1]
+    // PAK with (Q) in Group A should still parse
+    const pak = result![2].teams[1]
     expect(pak.team).toBe('Pakistan')
     expect(pak.won).toBe(2)
-    // NZ with (E) should still parse
-    const nz = result![3].teams[1]
+    // NZ with (E) in Group D should still parse
+    const nz = result![5].teams[1]
     expect(nz.team).toBe('New Zealand')
     expect(nz.won).toBe(2)
   })
 
-  it('filters out Super 8 groups', async () => {
+  it('includes Super 8 groups alongside Group Stage groups', async () => {
     mockedAxios.get.mockResolvedValueOnce({ data: buildPointsTableHTML() })
 
     const result = await scrapeStandings()
+    const groupNames = result!.map(g => g.group)
+    expect(groupNames).toContain('Super 8 Group 1')
+    expect(groupNames).toContain('Super 8 Group 2')
+    expect(groupNames).toContain('Group A')
+    expect(groupNames).toContain('Group D')
+  })
+
+  it('ignores legacy pre-seeding format (SUPER 8 G1)', async () => {
+    const legacyHTML = `
+      <html><body>
+        <div class="point-table-grid">Group APWLNRPtsNRR</div>
+        <div class="point-table-grid">1IND 33006+3.050</div>
+        <div class="point-table-grid">SUPER 8 G1 Pre-Seeding</div>
+        <div class="point-table-grid">1IND 000000.000</div>
+      </body></html>
+    `
+    mockedAxios.get.mockResolvedValueOnce({ data: legacyHTML })
+
+    const result = await scrapeStandings()
+    expect(result).toHaveLength(1)
+    expect(result![0].group).toBe('Group A')
     const groupNames = result!.map(g => g.group)
     expect(groupNames).not.toContain(expect.stringContaining('SUPER 8'))
   })
