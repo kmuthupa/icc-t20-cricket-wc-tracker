@@ -53,6 +53,32 @@ describe('GET /api/cricket', () => {
     expect(data.upcomingMatches).toEqual(mockUpcomingMatches)
   })
 
+  it('sets usingMockData: true and uses mock standings when only standings fails', async () => {
+    mockedScrapeStandings.mockResolvedValueOnce(null)
+    mockedScrapeMatches.mockResolvedValueOnce({ today: [], upcoming: [] })
+
+    const response = await GET()
+    const data = await response.json()
+
+    expect(data.usingMockData).toBe(true)
+    expect(data.standings).toEqual(mockStandings)
+    expect(data.todayMatches).toEqual([])
+  })
+
+  it('sets usingMockData: true and uses mock matches when only matches fails', async () => {
+    const liveStandings = [{ group: 'Super 8 Group 1', teams: [] }]
+    mockedScrapeStandings.mockResolvedValueOnce(liveStandings)
+    mockedScrapeMatches.mockResolvedValueOnce(null)
+
+    const response = await GET()
+    const data = await response.json()
+
+    expect(data.usingMockData).toBe(true)
+    expect(data.standings).toEqual(liveStandings)
+    expect(data.todayMatches).toEqual(mockTodayMatches)
+    expect(data.upcomingMatches).toEqual(mockUpcomingMatches)
+  })
+
   it('response shape matches expected interface', async () => {
     mockedScrapeStandings.mockResolvedValueOnce(null)
     mockedScrapeMatches.mockResolvedValueOnce(null)

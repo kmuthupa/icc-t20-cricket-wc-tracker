@@ -95,6 +95,9 @@ export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match
         return
       }
       
+      // Skip pre-seeding placeholder matches (e.g. "X1 vs X4", "Y2 vs Y3")
+      if (/^[XY]\d\s+vs\s+[XY]\d,/.test(title)) return
+
       // Parse title: "Team1 vs Team2, Match Info - Status"
       const titleMatch = title.match(/^(.+?)\s+vs\s+(.+?),\s*(.+?)\s*-\s*(.+)$/)
       if (!titleMatch) return
@@ -106,7 +109,7 @@ export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match
         id: `match-${index}`,
         team1: team1.trim(),
         team2: team2.trim(),
-        venue: matchInfo.trim(),
+        venue: matchInfo.trim().replace(/\s*\([XY]\d\s+v\s+[XY]\d\)/, ''),
         time: '',
         status,
         result: status === 'completed' ? statusText.trim() : undefined,
