@@ -108,7 +108,7 @@ export default function Home() {
 
         {data?.liveMatches && data.liveMatches.length > 0 && (
           <div className="card">
-            <div className="card-header">Live Matches</div>
+            <div className="card-header card-header-live">Live Matches</div>
             <div className="card-body">
               {data.liveMatches.map((match) => (
                 <div key={match.id} className="match-item">
@@ -130,7 +130,7 @@ export default function Home() {
         )}
 
         <div className="card">
-          <div className="card-header">Recent Results</div>
+          <div className="card-header card-header-results">Recent Results</div>
           <div className="card-body">
             {data?.recentResults.length === 0 ? (
               <p className="text-center" style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>
@@ -157,7 +157,7 @@ export default function Home() {
         </div>
 
         <div className="card">
-          <div className="card-header">Upcoming Fixtures</div>
+          <div className="card-header card-header-upcoming">Upcoming Fixtures</div>
           <div className="card-body">
             {data?.upcomingMatches.length === 0 ? (
               <p className="text-center" style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>
