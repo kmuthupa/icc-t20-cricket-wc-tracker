@@ -185,7 +185,7 @@ async function scrapeMatchScore(href: string): Promise<{ team1Score?: string, te
   }
 }
 
-function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
+export function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
   const lower = text.toLowerCase()
   if (lower.includes('won') || lower.includes('tied') || lower.includes('complete') ||
       lower.includes('drawn') || lower.includes('no result') || lower.includes('abandoned') ||
@@ -203,7 +203,7 @@ function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
   return 'upcoming'
 }
 
-function expandTeamName(abbr: string): string {
+export function expandTeamName(abbr: string): string {
   const teams: Record<string, string> = {
     'IND': 'India',
     'AUS': 'Australia',
