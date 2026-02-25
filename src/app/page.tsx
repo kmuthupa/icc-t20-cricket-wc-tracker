@@ -5,7 +5,8 @@ import { GroupStandings, Match } from '@/lib/mockData'
 
 interface CricketData {
   standings: GroupStandings[]
-  todayMatches: Match[]
+  liveMatches: Match[]
+  recentResults: Match[]
   upcomingMatches: Match[]
   usingMockData: boolean
   lastUpdated: string
@@ -94,19 +95,41 @@ export default function Home() {
           </div>
         ))}
 
-        <div className="card">
-          <div className="card-header">Today&apos;s Matches</div>
-          <div className="card-body">
-            {data?.todayMatches.length === 0 ? (
-              <p className="text-center" style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>
-                No matches today
-              </p>
-            ) : (
-              data?.todayMatches.map((match) => (
+        {data?.liveMatches && data.liveMatches.length > 0 && (
+          <div className="card">
+            <div className="card-header">Live Matches</div>
+            <div className="card-body">
+              {data.liveMatches.map((match) => (
                 <div key={match.id} className="match-item">
                   <div className="match-teams">
                     <span>{match.team1} vs {match.team2}</span>
-                    {match.status === 'live' && <span className="status-live">LIVE</span>}
+                    <span className="status-live">LIVE</span>
+                  </div>
+                  {match.team1Score && (
+                    <div className="match-score">
+                      {match.team1}: {match.team1Score}
+                      {match.team2Score && <> · {match.team2}: {match.team2Score}</>}
+                    </div>
+                  )}
+                  <div className="match-details">{match.venue}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="card">
+          <div className="card-header">Recent Results</div>
+          <div className="card-body">
+            {data?.recentResults.length === 0 ? (
+              <p className="text-center" style={{ color: 'var(--text-secondary)', padding: '1rem 0' }}>
+                No recent results
+              </p>
+            ) : (
+              data?.recentResults.map((match) => (
+                <div key={match.id} className="match-item">
+                  <div className="match-teams">
+                    <span>{match.team1} vs {match.team2}</span>
                   </div>
                   {match.team1Score && (
                     <div className="match-score">
