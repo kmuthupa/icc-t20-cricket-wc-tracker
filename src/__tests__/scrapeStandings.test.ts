@@ -55,11 +55,11 @@ describe('scrapeStandings', () => {
     expect(result![1].group).toBe('Group B')
   })
 
-  it('filters out Super 8 groups', async () => {
+  it('includes Super 8 groups alongside Group stage', async () => {
     const html = buildStandingsPage([
       'Group A',
       '1IND 32102+1.200',
-      'SUPER 8 G1',
+      'Super 8 Group 1',
       '1AUS 33004+2.000',
     ])
 
@@ -67,8 +67,26 @@ describe('scrapeStandings', () => {
 
     const result = await scrapeStandings()
     expect(result).not.toBeNull()
-    expect(result).toHaveLength(1)
+    expect(result).toHaveLength(2)
     expect(result![0].group).toBe('Group A')
+    expect(result![1].group).toBe('Super 8 Group 1')
+  })
+
+  it('parses teams with qualifier tag like (Q)', async () => {
+    const html = buildStandingsPage([
+      'Group A',
+      '1IND (Q)44008+2.500',
+    ])
+
+    mockedAxios.get.mockResolvedValue({ data: html })
+
+    const result = await scrapeStandings()
+    expect(result).not.toBeNull()
+    expect(result![0].teams).toHaveLength(1)
+    expect(result![0].teams[0].team).toBe('India')
+    expect(result![0].teams[0].played).toBe(4)
+    expect(result![0].teams[0].won).toBe(4)
+    expect(result![0].teams[0].points).toBe(8)
   })
 
   it('skips column header rows', async () => {

@@ -7,6 +7,7 @@ describe('expandTeamName', () => {
     expect(expandTeamName('ENG')).toBe('England')
     expect(expandTeamName('PAK')).toBe('Pakistan')
     expect(expandTeamName('SA')).toBe('South Africa')
+    expect(expandTeamName('RSA')).toBe('South Africa')
     expect(expandTeamName('NZ')).toBe('New Zealand')
     expect(expandTeamName('WI')).toBe('West Indies')
     expect(expandTeamName('SL')).toBe('Sri Lanka')

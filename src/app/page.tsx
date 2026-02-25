@@ -12,6 +12,42 @@ interface CricketData {
   lastUpdated: string
 }
 
+function StandingsTable({ group, muted }: { group: GroupStandings; muted?: boolean }) {
+  return (
+    <div className="card">
+      <div className={muted ? 'card-header-muted' : 'card-header'}>{group.group}</div>
+      <div className="card-body">
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Team</th>
+              <th className="text-center">P</th>
+              <th className="text-center">W</th>
+              <th className="text-center">L</th>
+              <th className="text-right">NRR</th>
+              <th className="text-right">Pts</th>
+            </tr>
+          </thead>
+          <tbody>
+            {group.teams.map((team) => (
+              <tr key={`${group.group}-${team.position}`}>
+                <td>{team.position}</td>
+                <td>{team.team}</td>
+                <td className="text-center">{team.played}</td>
+                <td className="text-center">{team.won}</td>
+                <td className="text-center">{team.lost}</td>
+                <td className="text-right">{team.nrr}</td>
+                <td className="text-right"><strong>{team.points}</strong></td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
 export default function Home() {
   const [data, setData] = useState<CricketData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -45,54 +81,29 @@ export default function Home() {
     )
   }
 
+  const super8Groups = data?.standings.filter(g => g.group.startsWith('Super 8')) ?? []
+  const groupStageGroups = data?.standings.filter(g => g.group.startsWith('Group')) ?? []
+
   return (
     <div className="container">
       <header>
         <h1>ICC T20 World Cup 2026</h1>
-        <p>Live Standings, Results & Fixtures</p>
+        <p>Super 8 Stage · Live Standings, Results & Fixtures</p>
       </header>
 
       {error && <div className="error">{error}</div>}
-      
+
       {data?.usingMockData && (
         <div className="notice">
-          Showing placeholder data. Live data will appear when the tournament begins.
+          Showing cached data. Live data will appear once available.
         </div>
       )}
 
+      {/* Super 8 standings */}
+      <div className="section-title">Super 8 Standings</div>
       <div className="grid">
-        {data?.standings.map((group) => (
-          <div key={group.group} className="card">
-            <div className="card-header">{group.group}</div>
-            <div className="card-body">
-              <table>
-                <thead>
-                  <tr>
-                    <th>#</th>
-                    <th>Team</th>
-                    <th className="text-center">P</th>
-                    <th className="text-center">W</th>
-                    <th className="text-center">L</th>
-                    <th className="text-right">NRR</th>
-                    <th className="text-right">Pts</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {group.teams.map((team) => (
-                    <tr key={`${group.group}-${team.position}`}>
-                      <td>{team.position}</td>
-                      <td>{team.team}</td>
-                      <td className="text-center">{team.played}</td>
-                      <td className="text-center">{team.won}</td>
-                      <td className="text-center">{team.lost}</td>
-                      <td className="text-right">{team.nrr}</td>
-                      <td className="text-right"><strong>{team.points}</strong></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+        {super8Groups.map((group) => (
+          <StandingsTable key={group.group} group={group} />
         ))}
 
         {data?.liveMatches && data.liveMatches.length > 0 && (
@@ -131,9 +142,9 @@ export default function Home() {
                   <div className="match-teams">
                     <span>{match.team1} vs {match.team2}</span>
                   </div>
-                  {match.team1Score && (
+                  {(match.team1Score || match.team2Score) && (
                     <div className="match-score">
-                      {match.team1}: {match.team1Score}
+                      {match.team1Score && <>{match.team1}: {match.team1Score}</>}
                       {match.team2Score && <> · {match.team2}: {match.team2Score}</>}
                     </div>
                   )}
@@ -164,6 +175,18 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      {/* Group Stage results */}
+      {groupStageGroups.length > 0 && (
+        <>
+          <div className="section-title">Group Stage Results</div>
+          <div className="grid">
+            {groupStageGroups.map((group) => (
+              <StandingsTable key={group.group} group={group} muted />
+            ))}
+          </div>
+        </>
+      )}
 
       {data?.lastUpdated && (
         <div className="last-updated">

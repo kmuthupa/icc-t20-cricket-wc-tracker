@@ -7,16 +7,18 @@ import {
 
 describe('mockData', () => {
   describe('mockStandings', () => {
-    it('has 4 groups (A-D)', () => {
-      expect(mockStandings).toHaveLength(4)
-      expect(mockStandings.map(g => g.group)).toEqual([
-        'Group A', 'Group B', 'Group C', 'Group D',
-      ])
+    it('has Super 8 and Group stage standings', () => {
+      expect(mockStandings.length).toBeGreaterThanOrEqual(4)
+      const groupNames = mockStandings.map(g => g.group)
+      expect(groupNames).toContain('Group A')
+      expect(groupNames).toContain('Group B')
+      expect(groupNames).toContain('Group C')
+      expect(groupNames).toContain('Group D')
     })
 
-    it('each group has 5 teams', () => {
+    it('each group has at least 4 teams', () => {
       mockStandings.forEach(group => {
-        expect(group.teams).toHaveLength(5)
+        expect(group.teams.length).toBeGreaterThanOrEqual(4)
       })
     })
 

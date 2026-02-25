@@ -184,6 +184,26 @@ describe('scrapeMatches', () => {
     expect(result).toBeNull()
   })
 
+  it('skips pre-seeding placeholder matches', async () => {
+    const html = buildMatchesPage([
+      buildMatchLink(
+        `/live-cricket-scores/99/${SERIES_SLUG}/placeholder`,
+        'X1 vs X4, Semi-Final - Tomorrow 14:00'
+      ),
+      buildMatchLink(
+        `/live-cricket-scores/1/${SERIES_SLUG}/match1`,
+        'India vs Australia, 1st Match - Tomorrow 14:00'
+      ),
+    ])
+
+    mockedAxios.get.mockResolvedValue({ data: html })
+
+    const result = await scrapeMatches()
+    expect(result).not.toBeNull()
+    expect(result!.upcoming).toHaveLength(1)
+    expect(result!.upcoming[0].team1).toBe('India')
+  })
+
   it('sets result text only for completed matches', async () => {
     const html = buildMatchesPage([
       buildMatchLink(
