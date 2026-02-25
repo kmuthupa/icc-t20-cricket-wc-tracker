@@ -86,7 +86,20 @@ export const mockStandings: GroupStandings[] = [
   },
 ]
 
-export const mockTodayMatches: Match[] = [
+export const mockLiveMatches: Match[] = [
+  {
+    id: '2',
+    team1: 'England',
+    team2: 'South Africa',
+    team1Score: '165/6 (18.2)',
+    team2Score: '158/4 (20)',
+    venue: 'Sydney Cricket Ground',
+    time: '19:00 IST',
+    status: 'live',
+  },
+]
+
+export const mockRecentResults: Match[] = [
   {
     id: '1',
     team1: 'India',
@@ -97,16 +110,6 @@ export const mockTodayMatches: Match[] = [
     venue: 'Melbourne Cricket Ground',
     time: '14:00 IST',
     status: 'completed',
-  },
-  {
-    id: '2',
-    team1: 'England',
-    team2: 'South Africa',
-    team1Score: '165/6 (18.2)',
-    team2Score: '158/4 (20)',
-    venue: 'Sydney Cricket Ground',
-    time: '19:00 IST',
-    status: 'live',
   },
 ]
 

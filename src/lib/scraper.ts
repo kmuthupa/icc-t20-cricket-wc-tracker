@@ -71,40 +71,41 @@ export async function scrapeStandings(): Promise<GroupStandings[] | null> {
   }
 }
 
-export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match[] } | null> {
+export async function scrapeMatches(): Promise<{ live: Match[], recent: Match[], upcoming: Match[] } | null> {
   try {
     const url = `${CRICBUZZ_BASE}/cricket-series/${SERIES_ID}/${SERIES_SLUG}/matches`
     const { data } = await axios.get(url, { headers, timeout: 15000 })
-    
+
     const $ = cheerio.load(data)
-    const today: Match[] = []
+    const live: Match[] = []
+    const recent: Match[] = []
     const upcoming: Match[] = []
     const seenHrefs = new Set<string>()
     const liveMatchUrls: { match: Match, href: string }[] = []
-    
+
     $('a[href*="/live-cricket-scores/"]').each((index, el) => {
       const title = $(el).attr('title') || ''
       const href = $(el).attr('href') || ''
-      
+
       // Skip duplicates
       if (seenHrefs.has(href)) return
       seenHrefs.add(href)
-      
+
       // Only include T20 WC matches
       if (!href.includes(SERIES_SLUG) && !title.toLowerCase().includes('t20 world cup 2026')) {
         return
       }
-      
+
       // Skip pre-seeding placeholder matches (e.g. "X1 vs X4", "Y2 vs Y3")
       if (/^[XY]\d\s+vs\s+[XY]\d,/.test(title)) return
 
       // Parse title: "Team1 vs Team2, Match Info - Status"
       const titleMatch = title.match(/^(.+?)\s+vs\s+(.+?),\s*(.+?)\s*-\s*(.+)$/)
       if (!titleMatch) return
-      
+
       const [, team1, team2, matchInfo, statusText] = titleMatch
       const status = parseStatus(statusText.trim())
-      
+
       const match: Match = {
         id: `match-${index}`,
         team1: team1.trim(),
@@ -114,19 +115,19 @@ export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match
         status,
         result: status === 'completed' ? statusText.trim() : undefined,
       }
-      
-      if (status === 'completed' || status === 'live') {
-        if (today.length < 5) {
-          today.push(match)
-          if (status === 'live') {
-            liveMatchUrls.push({ match, href })
-          }
+
+      if (status === 'live') {
+        if (live.length < 5) {
+          live.push(match)
+          liveMatchUrls.push({ match, href })
         }
+      } else if (status === 'completed') {
+        if (recent.length < 3) recent.push(match)
       } else {
         if (upcoming.length < 6) upcoming.push(match)
       }
     })
-    
+
     // Fetch scores for live matches
     await Promise.all(liveMatchUrls.map(async ({ match, href }) => {
       try {
@@ -145,8 +146,8 @@ export async function scrapeMatches(): Promise<{ today: Match[], upcoming: Match
         console.error('Failed to fetch score for', href, e)
       }
     }))
-    
-    return { today, upcoming }
+
+    return { live, recent, upcoming }
   } catch (error) {
     console.error('Failed to scrape matches:', error)
     return null

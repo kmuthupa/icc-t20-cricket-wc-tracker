@@ -369,7 +369,7 @@ describe('scrapeMatches', () => {
     return `<html><body>${anchors}</body></html>`
   }
 
-  it('separates today vs upcoming matches', async () => {
+  it('separates live, recent, and upcoming matches', async () => {
     mockedAxios.get.mockResolvedValueOnce({
       data: buildMatchesHTML([
         { title: 'India vs Australia, Match 1 - India won by 14 runs', href: '/live-cricket-scores/1/icc-mens-t20-world-cup-2026/ind-vs-aus' },
@@ -379,9 +379,9 @@ describe('scrapeMatches', () => {
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
-    expect(result!.today).toHaveLength(1)
-    expect(result!.today[0].team1).toBe('India')
-    expect(result!.today[0].status).toBe('completed')
+    expect(result!.recent).toHaveLength(1)
+    expect(result!.recent[0].team1).toBe('India')
+    expect(result!.recent[0].status).toBe('completed')
     expect(result!.upcoming).toHaveLength(1)
     expect(result!.upcoming[0].team1).toBe('England')
     expect(result!.upcoming[0].status).toBe('upcoming')
@@ -401,12 +401,12 @@ describe('scrapeMatches', () => {
     })
 
     const result = await scrapeMatches()
-    expect(result!.today[0].status).toBe('completed')
-    expect(result!.today[1].status).toBe('live')
+    expect(result!.recent[0].status).toBe('completed')
+    expect(result!.live[0].status).toBe('live')
     expect(result!.upcoming[0].status).toBe('upcoming')
   })
 
-  it('respects max limits (5 today, 6 upcoming)', async () => {
+  it('respects max limits (3 recent, 5 live, 6 upcoming)', async () => {
     const completedLinks = Array.from({ length: 8 }, (_, i) => ({
       title: `Team${i}A vs Team${i}B, Match ${i} - Team${i}A won`,
       href: `/live-cricket-scores/${i}/icc-mens-t20-world-cup-2026/match-${i}`,
@@ -421,7 +421,7 @@ describe('scrapeMatches', () => {
     })
 
     const result = await scrapeMatches()
-    expect(result!.today.length).toBeLessThanOrEqual(5)
+    expect(result!.recent.length).toBeLessThanOrEqual(3)
     expect(result!.upcoming.length).toBeLessThanOrEqual(6)
   })
 
@@ -435,7 +435,7 @@ describe('scrapeMatches', () => {
     })
 
     const result = await scrapeMatches()
-    expect(result!.today).toHaveLength(1)
+    expect(result!.recent).toHaveLength(1)
   })
 
   it('correctly attributes live scores to the right team (bug fix)', async () => {
@@ -451,7 +451,7 @@ describe('scrapeMatches', () => {
     })
 
     const result = await scrapeMatches()
-    const liveMatch = result!.today[0]
+    const liveMatch = result!.live[0]
     expect(liveMatch.team1).toBe('Australia')
     expect(liveMatch.team2).toBe('Sri Lanka')
     // SL score should be on team2, NOT team1
@@ -469,8 +469,8 @@ describe('scrapeMatches', () => {
     })
 
     const result = await scrapeMatches()
-    expect(result!.today).toHaveLength(1)
-    expect(result!.today[0].team1).toBe('India')
+    expect(result!.recent).toHaveLength(1)
+    expect(result!.recent[0].team1).toBe('India')
     expect(result!.upcoming).toHaveLength(0)
   })
 
@@ -483,8 +483,8 @@ describe('scrapeMatches', () => {
     })
 
     const result = await scrapeMatches()
-    expect(result!.today).toHaveLength(1)
-    expect(result!.today[0].team1).toBe('England')
+    expect(result!.recent).toHaveLength(1)
+    expect(result!.recent[0].team1).toBe('England')
   })
 
   it('skips match titles that do not match expected format', async () => {
@@ -496,8 +496,8 @@ describe('scrapeMatches', () => {
     })
 
     const result = await scrapeMatches()
-    expect(result!.today).toHaveLength(1)
-    expect(result!.today[0].team1).toBe('India')
+    expect(result!.recent).toHaveLength(1)
+    expect(result!.recent[0].team1).toBe('India')
   })
 
   it('returns empty arrays when no matches are found', async () => {
@@ -505,7 +505,8 @@ describe('scrapeMatches', () => {
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
-    expect(result!.today).toHaveLength(0)
+    expect(result!.live).toHaveLength(0)
+    expect(result!.recent).toHaveLength(0)
     expect(result!.upcoming).toHaveLength(0)
   })
 
@@ -519,7 +520,7 @@ describe('scrapeMatches', () => {
     mockedAxios.get.mockResolvedValueOnce({ data: '<html><body></body></html>' }) // score page
 
     const result = await scrapeMatches()
-    expect(result!.today[0].venue).toBe('43rd Match, Super 8 Group 1')
+    expect(result!.live[0].venue).toBe('43rd Match, Super 8 Group 1')
     expect(result!.upcoming[0].venue).toBe('41st Match, Super 8 Group 2')
   })
 
@@ -531,7 +532,7 @@ describe('scrapeMatches', () => {
     })
 
     const result = await scrapeMatches()
-    const match = result!.today[0]
+    const match = result!.recent[0]
     expect(match.result).toBe('India won by 14 runs')
     expect(match.venue).toBe('1st Match Group A')
     expect(match.status).toBe('completed')
@@ -549,7 +550,7 @@ describe('scrapeMatches', () => {
     })
 
     const result = await scrapeMatches()
-    const match = result!.today[0]
+    const match = result!.live[0]
     expect(match.team1Score).toBe('45/2 (6.3)')  // India is team1, batting second
     expect(match.team2Score).toBe('186/4 (20)')  // Pakistan is team2, batted first
   })
