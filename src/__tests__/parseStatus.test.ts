@@ -93,6 +93,20 @@ describe('parseStatus', () => {
     it('detects toss results', () => {
       expect(parseStatus('India opt to bat')).toBe('live')
       expect(parseStatus('England elected to bowl')).toBe('live')
+      expect(parseStatus('India chose to bat')).toBe('live')
+    })
+
+    it('detects "won the toss" as live, not completed', () => {
+      expect(parseStatus('India won the toss and elected to bat')).toBe('live')
+      expect(parseStatus('NZ won the toss and chose to bowl')).toBe('live')
+      expect(parseStatus('Toss: India opted to bat first')).toBe('live')
+    })
+
+    it('detects score-based status as live', () => {
+      expect(parseStatus('NZ 159/7 (20 Ovs)')).toBe('live')
+      expect(parseStatus('ENG 47/2 (6.0 Ovs)')).toBe('live')
+      expect(parseStatus('IND 186-4 (18.2)')).toBe('live')
+      expect(parseStatus('PAK 95/3 (12)')).toBe('live')
     })
 
     it('detects batting/bowling', () => {

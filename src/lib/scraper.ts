@@ -187,6 +187,11 @@ export async function scrapeMatchScore(href: string): Promise<{ team: string, sc
 
 export function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
   const lower = text.toLowerCase()
+
+  // Toss results indicate a match has just started — check before completed
+  // because "won the toss" contains "won" which would false-positive as completed
+  if (lower.includes('toss')) return 'live'
+
   if (lower.includes('won') || lower.includes('tied') || lower.includes('complete') ||
       lower.includes('drawn') || lower.includes('no result') || lower.includes('abandoned') ||
       lower.includes('cancelled') || lower.includes('beat') || lower.includes('defeated') ||
@@ -197,7 +202,9 @@ export function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
   }
   if (lower.includes('live') || lower.includes('innings') || lower.includes('break') ||
       lower.includes('opt to') || lower.includes('elected to') || lower.includes('batting') ||
-      lower.includes('bowling') || lower.includes('target') || lower.includes('need')) {
+      lower.includes('bowling') || lower.includes('target') || lower.includes('need') ||
+      lower.includes('chose to') ||
+      /\d+[/-]\d+\s*\(/.test(lower)) {  // Score pattern: "159/7 (20" or "47-2 (6.0"
     return 'live'
   }
   return 'upcoming'
