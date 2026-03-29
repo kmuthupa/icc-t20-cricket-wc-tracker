@@ -3,7 +3,7 @@ import * as cheerio from 'cheerio'
 import { TeamStanding, GroupStandings, Match } from './mockData'
 
 const CRICBUZZ_BASE = 'https://www.cricbuzz.com'
-const SERIES_ID = '9237'  // TODO: confirm from cricbuzz.com/cricket-series/ URL
+const SERIES_ID = '9241'
 const SERIES_SLUG = 'indian-premier-league-2026'
 
 const headers = {

@@ -75,8 +75,8 @@ Matches are split into three separate arrays — never combined:
 ### IPL teams
 
 10 franchises split into 2 groups (A & B):
-- **Group A:** RCB, CSK, MI, DC, PBKS
-- **Group B:** KKR, RR, LSG, GT, SRH
+- **Group A:** CSK, RCB, RR, PBKS, KKR
+- **Group B:** MI, GT, DC, SRH, LSG
 
 ### Score attribution
 
@@ -117,4 +117,4 @@ Live match scores are fetched from individual match pages. Scores are matched to
 - **Word boundary for "match over":** Uses `/\bmatch over\b/` regex — bare `includes('over')` would false-positive on "overs" in live match text.
 - **Score page team matching:** `scrapeMatchScore` returns abbreviations. Always use `expandTeamName()` when comparing to match team names.
 - **Duplicate hrefs:** Cricbuzz pages often repeat links. The scraper deduplicates via `seenHrefs` Set.
-- **Series ID:** Currently using placeholder series ID `9237` with slug `indian-premier-league-2026`. Update when the real Cricbuzz URL is known — app falls back to mock data when scraping fails.
+- **Series ID:** Cricbuzz series ID is `9241` with slug `indian-premier-league-2026`. If scraping fails, the app falls back to mock data.

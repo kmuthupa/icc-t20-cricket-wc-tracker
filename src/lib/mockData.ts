@@ -31,18 +31,18 @@ export const mockStandings: GroupStandings[] = [
     teams: [
       { position: 1, team: 'Royal Challengers Bengaluru', played: 1, won: 1, lost: 0, nrr: '+1.850', points: 2 },
       { position: 2, team: 'Chennai Super Kings', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
-      { position: 3, team: 'Mumbai Indians', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
-      { position: 4, team: 'Delhi Capitals', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
-      { position: 5, team: 'Punjab Kings', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 3, team: 'Rajasthan Royals', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 4, team: 'Punjab Kings', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 5, team: 'Kolkata Knight Riders', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
     ]
   },
   {
     group: 'Group B',
     teams: [
-      { position: 1, team: 'Kolkata Knight Riders', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
-      { position: 2, team: 'Rajasthan Royals', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
-      { position: 3, team: 'Lucknow Super Giants', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
-      { position: 4, team: 'Gujarat Titans', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 1, team: 'Mumbai Indians', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 2, team: 'Gujarat Titans', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 3, team: 'Delhi Capitals', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
+      { position: 4, team: 'Lucknow Super Giants', played: 0, won: 0, lost: 0, nrr: '0.000', points: 0 },
       { position: 5, team: 'Sunrisers Hyderabad', played: 1, won: 0, lost: 1, nrr: '-1.850', points: 0 },
     ]
   },
