@@ -3,8 +3,8 @@ import * as cheerio from 'cheerio'
 import { TeamStanding, GroupStandings, Match } from './mockData'
 
 const CRICBUZZ_BASE = 'https://www.cricbuzz.com'
-const SERIES_ID = '11253'
-const SERIES_SLUG = 'icc-mens-t20-world-cup-2026'
+const SERIES_ID = '9237'  // TODO: confirm from cricbuzz.com/cricket-series/ URL
+const SERIES_SLUG = 'indian-premier-league-2026'
 
 const headers = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
@@ -26,7 +26,7 @@ export async function scrapeStandings(): Promise<GroupStandings[] | null> {
       const text = $(row).text().trim().replace(/\s+/g, ' ')
       
       // Check for group header
-      const groupMatch = text.match(/^(Group [A-D]|Super 8 Group \d)/)
+      const groupMatch = text.match(/^(Group [A-Z]|Points Table)/)
       if (groupMatch) {
         if (currentGroupName && currentTeams.length > 0) {
           groups.push({ group: currentGroupName, teams: currentTeams })
@@ -37,7 +37,7 @@ export async function scrapeStandings(): Promise<GroupStandings[] | null> {
       }
       
       // Skip column headers
-      if (text.includes('PWL') || text.includes('NRPts') || text.includes('Pre-Seeding')) {
+      if (text.includes('PWL') || text.includes('NRPts')) {
         return
       }
       
@@ -61,8 +61,7 @@ export async function scrapeStandings(): Promise<GroupStandings[] | null> {
       groups.push({ group: currentGroupName, teams: currentTeams })
     }
     
-    // Return Super 8 groups (active stage) and Group A-D (completed stage)
-    const mainGroups = groups.filter(g => g.group.startsWith('Group') || g.group.startsWith('Super 8'))
+    const mainGroups = groups.filter(g => g.group.startsWith('Group') || g.group === 'Points Table')
     
     return mainGroups.length > 0 ? mainGroups : null
   } catch (error) {
@@ -91,13 +90,10 @@ export async function scrapeMatches(): Promise<{ live: Match[], recent: Match[],
       if (seenHrefs.has(href)) return
       seenHrefs.add(href)
 
-      // Only include T20 WC matches
-      if (!href.includes(SERIES_SLUG) && !title.toLowerCase().includes('t20 world cup 2026')) {
+      // Only include IPL matches
+      if (!href.includes(SERIES_SLUG) && !title.toLowerCase().includes('indian premier league')) {
         return
       }
-
-      // Skip pre-seeding placeholder matches (e.g. "X1 vs X4", "Y2 vs Y3")
-      if (/^[XY]\d\s+vs\s+[XY]\d,/.test(title)) return
 
       // Parse title: "Team1 vs Team2, Match Info - Status"
       const titleMatch = title.match(/^(.+?)\s+vs\s+(.+?),\s*(.+?)\s*-\s*(.+)$/)
@@ -110,7 +106,7 @@ export async function scrapeMatches(): Promise<{ live: Match[], recent: Match[],
         id: `match-${index}`,
         team1: team1.trim(),
         team2: team2.trim(),
-        venue: matchInfo.trim().replace(/\s*\([XY]\d\s+v\s+[XY]\d\)/, ''),
+        venue: matchInfo.trim(),
         time: '',
         status,
         result: status === 'completed' ? statusText.trim() : undefined,
@@ -212,32 +208,16 @@ export function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
 
 export function expandTeamName(abbr: string): string {
   const teams: Record<string, string> = {
-    'IND': 'India',
-    'AUS': 'Australia',
-    'ENG': 'England',
-    'PAK': 'Pakistan',
-    'SA': 'South Africa',
-    'RSA': 'South Africa',
-    'NZ': 'New Zealand',
-    'WI': 'West Indies',
-    'SL': 'Sri Lanka',
-    'BAN': 'Bangladesh',
-    'AFG': 'Afghanistan',
-    'ZIM': 'Zimbabwe',
-    'IRE': 'Ireland',
-    'SCO': 'Scotland',
-    'NAM': 'Namibia',
-    'NED': 'Netherlands',
-    'NEP': 'Nepal',
-    'USA': 'USA',
-    'UAE': 'UAE',
-    'OMAN': 'Oman',
-    'ITA': 'Italy',
-    'PNG': 'Papua New Guinea',
-    'CAN': 'Canada',
-    'HK': 'Hong Kong',
-    'KEN': 'Kenya',
-    'UGA': 'Uganda',
+    'MI': 'Mumbai Indians',
+    'CSK': 'Chennai Super Kings',
+    'RCB': 'Royal Challengers Bengaluru',
+    'KKR': 'Kolkata Knight Riders',
+    'DC': 'Delhi Capitals',
+    'SRH': 'Sunrisers Hyderabad',
+    'RR': 'Rajasthan Royals',
+    'PBKS': 'Punjab Kings',
+    'LSG': 'Lucknow Super Giants',
+    'GT': 'Gujarat Titans',
   }
   return teams[abbr] || abbr
 }

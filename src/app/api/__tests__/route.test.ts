@@ -22,9 +22,9 @@ describe('GET /api/cricket', () => {
   beforeEach(() => jest.clearAllMocks())
 
   it('returns live data with usingMockData: false when scraping succeeds', async () => {
-    const liveStandings = [{ group: 'Group A', teams: [{ position: 1, team: 'India', played: 1, won: 1, lost: 0, nrr: '+1.500', points: 2 }] }]
+    const liveStandings = [{ group: 'Group A', teams: [{ position: 1, team: 'Mumbai Indians', played: 1, won: 1, lost: 0, nrr: '+1.500', points: 2 }] }]
     const liveMatches = {
-      live: [{ id: '1', team1: 'India', team2: 'Australia', venue: 'MCG', time: '', status: 'live' as const }],
+      live: [{ id: '1', team1: 'Mumbai Indians', team2: 'Chennai Super Kings', venue: 'Wankhede Stadium', time: '', status: 'live' as const }],
       recent: [],
       upcoming: [],
     }
@@ -69,7 +69,7 @@ describe('GET /api/cricket', () => {
   })
 
   it('sets usingMockData: true and uses mock matches when only matches fails', async () => {
-    const liveStandings = [{ group: 'Super 8 Group 1', teams: [] }]
+    const liveStandings = [{ group: 'Group A', teams: [] }]
     mockedScrapeStandings.mockResolvedValueOnce(liveStandings)
     mockedScrapeMatches.mockResolvedValueOnce(null)
 
@@ -97,7 +97,6 @@ describe('GET /api/cricket', () => {
     expect(data).toHaveProperty('usingMockData')
     expect(data).toHaveProperty('lastUpdated')
     expect(typeof data.lastUpdated).toBe('string')
-    // lastUpdated should be a valid ISO date
     expect(new Date(data.lastUpdated).toISOString()).toBe(data.lastUpdated)
   })
 })
