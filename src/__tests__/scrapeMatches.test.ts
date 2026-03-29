@@ -4,7 +4,7 @@ import axios from 'axios'
 jest.mock('axios')
 const mockedAxios = axios as jest.Mocked<typeof axios>
 
-const SERIES_SLUG = 'icc-mens-t20-world-cup-2026'
+const SERIES_SLUG = 'indian-premier-league-2026'
 
 function buildMatchLink(href: string, title: string): string {
   return `<a href="${href}" title="${title}">Match</a>`
@@ -23,43 +23,38 @@ describe('scrapeMatches', () => {
     const html = buildMatchesPage([
       buildMatchLink(
         `/live-cricket-scores/1/${SERIES_SLUG}/match1`,
-        'India vs Australia, 1st Match - India won by 14 runs'
+        'Mumbai Indians vs Chennai Super Kings, 1st Match - Mumbai Indians won by 14 runs'
       ),
       buildMatchLink(
         `/live-cricket-scores/2/${SERIES_SLUG}/match2`,
-        'England vs South Africa, 2nd Match - Live'
+        'Royal Challengers Bengaluru vs Kolkata Knight Riders, 2nd Match - Live'
       ),
       buildMatchLink(
         `/live-cricket-scores/3/${SERIES_SLUG}/match3`,
-        'Pakistan vs New Zealand, 3rd Match - Tomorrow, 14:00 IST'
+        'Delhi Capitals vs Rajasthan Royals, 3rd Match - Tomorrow, 14:00 IST'
       ),
     ])
 
-    // First call: matches page, second call: live score page
     mockedAxios.get.mockImplementation((url: string) => {
       if (url.includes('/matches')) {
         return Promise.resolve({ data: html })
       }
-      // Live score page - return minimal HTML
       return Promise.resolve({ data: '<html><body></body></html>' })
     })
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
 
-    // India won = completed -> recent
     expect(result!.recent).toHaveLength(1)
-    expect(result!.recent[0].team1).toBe('India')
+    expect(result!.recent[0].team1).toBe('Mumbai Indians')
     expect(result!.recent[0].status).toBe('completed')
 
-    // England Live -> live
     expect(result!.live).toHaveLength(1)
-    expect(result!.live[0].team1).toBe('England')
+    expect(result!.live[0].team1).toBe('Royal Challengers Bengaluru')
     expect(result!.live[0].status).toBe('live')
 
-    // Pakistan Tomorrow -> upcoming
     expect(result!.upcoming).toHaveLength(1)
-    expect(result!.upcoming[0].team1).toBe('Pakistan')
+    expect(result!.upcoming[0].team1).toBe('Delhi Capitals')
     expect(result!.upcoming[0].status).toBe('upcoming')
   })
 
@@ -67,15 +62,15 @@ describe('scrapeMatches', () => {
     const html = buildMatchesPage([
       buildMatchLink(
         `/live-cricket-scores/1/${SERIES_SLUG}/match1`,
-        'India vs Australia, 1st Match - India won by 14 runs'
+        'Mumbai Indians vs Chennai Super Kings, 1st Match - Mumbai Indians won by 14 runs'
       ),
       buildMatchLink(
         `/live-cricket-scores/2/${SERIES_SLUG}/match2`,
-        'England vs South Africa, 2nd Match - England beat South Africa'
+        'Royal Challengers Bengaluru vs Kolkata Knight Riders, 2nd Match - Royal Challengers Bengaluru beat Kolkata Knight Riders'
       ),
       buildMatchLink(
         `/live-cricket-scores/3/${SERIES_SLUG}/match3`,
-        'Pakistan vs New Zealand, 3rd Match - Match abandoned'
+        'Delhi Capitals vs Rajasthan Royals, 3rd Match - Match abandoned'
       ),
     ])
 
@@ -87,8 +82,8 @@ describe('scrapeMatches', () => {
     expect(result!.recent).toHaveLength(3)
     expect(result!.upcoming).toHaveLength(0)
 
-    expect(result!.recent[0].result).toBe('India won by 14 runs')
-    expect(result!.recent[1].result).toBe('England beat South Africa')
+    expect(result!.recent[0].result).toBe('Mumbai Indians won by 14 runs')
+    expect(result!.recent[1].result).toBe('Royal Challengers Bengaluru beat Kolkata Knight Riders')
     expect(result!.recent[2].result).toBe('Match abandoned')
   })
 
@@ -143,11 +138,11 @@ describe('scrapeMatches', () => {
     const html = buildMatchesPage([
       buildMatchLink(
         `/live-cricket-scores/1/${SERIES_SLUG}/match1`,
-        'India vs Australia, 1st Match - Live'
+        'Mumbai Indians vs Chennai Super Kings, 1st Match - Live'
       ),
       buildMatchLink(
         `/live-cricket-scores/1/${SERIES_SLUG}/match1`,
-        'India vs Australia, 1st Match - Live'
+        'Mumbai Indians vs Chennai Super Kings, 1st Match - Live'
       ),
     ])
 
@@ -160,7 +155,7 @@ describe('scrapeMatches', () => {
     expect(result!.live).toHaveLength(1)
   })
 
-  it('skips non-WC matches', async () => {
+  it('skips non-IPL matches', async () => {
     const html = buildMatchesPage([
       buildMatchLink(
         '/live-cricket-scores/1/some-other-series/match1',
@@ -184,39 +179,19 @@ describe('scrapeMatches', () => {
     expect(result).toBeNull()
   })
 
-  it('skips pre-seeding placeholder matches', async () => {
-    const html = buildMatchesPage([
-      buildMatchLink(
-        `/live-cricket-scores/99/${SERIES_SLUG}/placeholder`,
-        'X1 vs X4, Semi-Final - Tomorrow 14:00'
-      ),
-      buildMatchLink(
-        `/live-cricket-scores/1/${SERIES_SLUG}/match1`,
-        'India vs Australia, 1st Match - Tomorrow 14:00'
-      ),
-    ])
-
-    mockedAxios.get.mockResolvedValue({ data: html })
-
-    const result = await scrapeMatches()
-    expect(result).not.toBeNull()
-    expect(result!.upcoming).toHaveLength(1)
-    expect(result!.upcoming[0].team1).toBe('India')
-  })
-
   it('sets result text only for completed matches', async () => {
     const html = buildMatchesPage([
       buildMatchLink(
         `/live-cricket-scores/1/${SERIES_SLUG}/match1`,
-        'India vs Australia, 1st Match - India won by 14 runs'
+        'Mumbai Indians vs Chennai Super Kings, 1st Match - Mumbai Indians won by 14 runs'
       ),
       buildMatchLink(
         `/live-cricket-scores/2/${SERIES_SLUG}/match2`,
-        'England vs South Africa, 2nd Match - Live'
+        'Royal Challengers Bengaluru vs Kolkata Knight Riders, 2nd Match - Live'
       ),
       buildMatchLink(
         `/live-cricket-scores/3/${SERIES_SLUG}/match3`,
-        'Pakistan vs New Zealand, 3rd Match - Tomorrow 14:00'
+        'Delhi Capitals vs Rajasthan Royals, 3rd Match - Tomorrow 14:00'
       ),
     ])
 
@@ -226,7 +201,7 @@ describe('scrapeMatches', () => {
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
-    expect(result!.recent[0].result).toBe('India won by 14 runs')
+    expect(result!.recent[0].result).toBe('Mumbai Indians won by 14 runs')
     expect(result!.live[0].result).toBeUndefined()
     expect(result!.upcoming[0].result).toBeUndefined()
   })

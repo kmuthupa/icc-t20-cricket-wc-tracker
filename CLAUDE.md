@@ -19,7 +19,7 @@ Use `source ~/.nvm/nvm.sh && nvm use 20` before all npm/node commands.
 
 ## Architecture
 
-Next.js app that scrapes Cricbuzz for ICC T20 World Cup 2026 data (standings + matches), falling back to mock data when scraping fails.
+Next.js app that scrapes Cricbuzz for IPL 2026 data (standings + matches), falling back to mock data when scraping fails.
 
 ```
 src/
@@ -40,13 +40,13 @@ src/
 - `scrapeMatches()` — Returns `{ live, recent, upcoming }` or `null`
 - `scrapeMatchScore(href)` — Fetches live score page, returns `{ team, score }[]` or `null`
 - `parseStatus(text)` — Classifies match status: `'completed' | 'live' | 'upcoming'`
-- `expandTeamName(abbr)` — Maps abbreviations (IND, AUS, RSA, etc.) to full names
+- `expandTeamName(abbr)` — Maps IPL franchise abbreviations (MI, CSK, RCB, etc.) to full names
 
 ### API response shape
 
 ```typescript
 {
-  standings: GroupStandings[]     // Super 8 + Group A-D
+  standings: GroupStandings[]     // Group A + Group B (or Points Table)
   liveMatches: Match[]           // Currently in progress (max 5)
   recentResults: Match[]         // Completed matches (max 3)
   upcomingMatches: Match[]       // Scheduled matches (max 6)
@@ -72,11 +72,15 @@ Matches are split into three separate arrays — never combined:
 - `recent` — status is `'completed'`, max 3
 - `upcoming` — status is `'upcoming'`, max 6
 
-Pre-seeding placeholders (e.g. "X1 vs X4") are filtered out. Venue seeding annotations like `(X1 v X4)` are stripped.
+### IPL teams
+
+10 franchises split into 2 groups (A & B):
+- **Group A:** RCB, CSK, MI, DC, PBKS
+- **Group B:** KKR, RR, LSG, GT, SRH
 
 ### Score attribution
 
-Live match scores are fetched from individual match pages. Scores are matched to the correct team using `expandTeamName()` — the score page returns abbreviations (e.g. "IND", "SL") that must map to the full team names used in match objects.
+Live match scores are fetched from individual match pages. Scores are matched to the correct team using `expandTeamName()` — the score page returns abbreviations (e.g. "MI", "CSK") that must map to the full team names used in match objects.
 
 ## UI / CSS
 
@@ -85,7 +89,6 @@ Live match scores are fetched from individual match pages. Scores are matched to
   - `.card-header-live` — Rose/red for live matches
   - `.card-header-results` — Sage green for recent results
   - `.card-header-upcoming` — Sky blue for upcoming fixtures
-  - `.card-header-muted` — Plain white for completed group stages
 - No dark mode. No hover lift effects. Only subtle blink animation for the live dot.
 - Uses CSS custom properties (`:root` vars) for all colors.
 
@@ -95,17 +98,16 @@ Live match scores are fetched from individual match pages. Scores are matched to
 - `@/` path alias mapped via `moduleNameMapper`
 - Mock `axios` for scraper tests, mock `@/lib/scraper` for API route tests
 - Test files in both `src/__tests__/` and `src/lib/__tests__/`
-- 96 tests across 7 suites
 
 ### Test file map
 
 | File | Tests |
 |------|-------|
 | `src/__tests__/parseStatus.test.ts` | All completion/live/upcoming keywords + edge cases |
-| `src/__tests__/expandTeamName.test.ts` | Team abbreviation mapping (including RSA) |
-| `src/__tests__/scrapeMatches.test.ts` | Separation, limits, dedup, non-WC filter, placeholders |
-| `src/__tests__/scrapeStandings.test.ts` | Parsing, Super 8, qualifier tags, error handling |
-| `src/__tests__/mockData.test.ts` | Data structure validation |
+| `src/__tests__/expandTeamName.test.ts` | IPL franchise abbreviation mapping |
+| `src/__tests__/scrapeMatches.test.ts` | Separation, limits, dedup, non-IPL filter |
+| `src/__tests__/scrapeStandings.test.ts` | Parsing, Points Table, qualifier tags, error handling |
+| `src/__tests__/mockData.test.ts` | Data structure validation (2 groups, 5 teams each) |
 | `src/lib/__tests__/scraper.test.ts` | Integration-style tests with realistic HTML mocks |
 | `src/app/api/__tests__/route.test.ts` | API route with mocked scraper + mock data fallback |
 
@@ -115,3 +117,4 @@ Live match scores are fetched from individual match pages. Scores are matched to
 - **Word boundary for "match over":** Uses `/\bmatch over\b/` regex — bare `includes('over')` would false-positive on "overs" in live match text.
 - **Score page team matching:** `scrapeMatchScore` returns abbreviations. Always use `expandTeamName()` when comparing to match team names.
 - **Duplicate hrefs:** Cricbuzz pages often repeat links. The scraper deduplicates via `seenHrefs` Set.
+- **Series ID:** Currently using placeholder series ID `9237` with slug `indian-premier-league-2026`. Update when the real Cricbuzz URL is known — app falls back to mock data when scraping fails.

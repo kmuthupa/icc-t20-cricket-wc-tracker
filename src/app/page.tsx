@@ -81,14 +81,11 @@ export default function Home() {
     )
   }
 
-  const super8Groups = data?.standings.filter(g => g.group.startsWith('Super 8')) ?? []
-  const groupStageGroups = data?.standings.filter(g => g.group.startsWith('Group')) ?? []
-
   return (
     <div className="container">
       <header>
-        <h1>ICC T20 World Cup 2026</h1>
-        <p>Super 8 Stage · Live Standings, Results & Fixtures</p>
+        <h1>IPL 2026</h1>
+        <p>Live Standings, Results & Fixtures</p>
       </header>
 
       {error && <div className="error">{error}</div>}
@@ -99,10 +96,9 @@ export default function Home() {
         </div>
       )}
 
-      {/* Super 8 standings */}
-      <div className="section-title">Super 8 Standings</div>
+      <div className="section-title">Standings</div>
       <div className="grid">
-        {super8Groups.map((group) => (
+        {data?.standings.map((group) => (
           <StandingsTable key={group.group} group={group} />
         ))}
 
@@ -175,18 +171,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      {/* Group Stage results */}
-      {groupStageGroups.length > 0 && (
-        <>
-          <div className="section-title">Group Stage Results</div>
-          <div className="grid">
-            {groupStageGroups.map((group) => (
-              <StandingsTable key={group.group} group={group} muted />
-            ))}
-          </div>
-        </>
-      )}
 
       {data?.lastUpdated && (
         <div className="last-updated">
