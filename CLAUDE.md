@@ -19,7 +19,7 @@ Use `source ~/.nvm/nvm.sh && nvm use 20` before all npm/node commands.
 
 ## Architecture
 
-Next.js app that scrapes Cricbuzz for IPL 2026 data (standings + matches), falling back to mock data when scraping fails.
+Next.js app that fetches IPL 2026 data (standings + matches) from ESPNCricinfo JSON API (primary), with Cricbuzz HTML scraping as fallback, and mock data as final fallback.
 
 ```
 src/
@@ -117,4 +117,5 @@ Live match scores are fetched from individual match pages. Scores are matched to
 - **Word boundary for "match over":** Uses `/\bmatch over\b/` regex — bare `includes('over')` would false-positive on "overs" in live match text.
 - **Score page team matching:** `scrapeMatchScore` returns abbreviations. Always use `expandTeamName()` when comparing to match team names.
 - **Duplicate hrefs:** Cricbuzz pages often repeat links. The scraper deduplicates via `seenHrefs` Set.
-- **Series ID:** Cricbuzz series ID is `9241` with slug `indian-premier-league-2026`. If scraping fails, the app falls back to mock data.
+- **Data sources:** ESPNCricinfo API (series ID `1510719`) is primary. Cricbuzz (series ID `9241`, slug `indian-premier-league-2026`) is fallback. Mock data is final fallback.
+- **Cricbuzz Cloudflare:** Cricbuzz uses Cloudflare which blocks server-side requests. ESPNCricinfo API (`hs-consumer-api.espncricinfo.com`) has no such protection.
