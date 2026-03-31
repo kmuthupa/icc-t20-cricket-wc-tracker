@@ -10,6 +10,21 @@ import {
 jest.mock('axios')
 const mockedAxios = axios as jest.Mocked<typeof axios>
 
+// Helper: ESPN API returns empty/error so tests exercise the Cricbuzz fallback path
+function mockEspnFailCricbuzz(cricbuzzResponses: { url: string, data: string }[]) {
+  mockedAxios.get.mockImplementation((url: string) => {
+    if (url.includes('hs-consumer-api.espncricinfo.com')) {
+      return Promise.reject(new Error('ESPN unavailable'))
+    }
+    for (const resp of cricbuzzResponses) {
+      if (url.includes(resp.url)) {
+        return Promise.resolve({ data: resp.data })
+      }
+    }
+    return Promise.resolve({ data: '<html><body></body></html>' })
+  })
+}
+
 // ─── expandTeamName ──────────────────────────────────────────────────────────
 
 describe('expandTeamName', () => {
@@ -92,21 +107,21 @@ describe('scrapeStandings', () => {
       <div class="point-table-grid">Group APWLNRPtsNRR</div>
       <div class="point-table-grid">1RCB 11002+1.850</div>
       <div class="point-table-grid">2CSK 000000.000</div>
-      <div class="point-table-grid">3MI 000000.000</div>
-      <div class="point-table-grid">4DC 000000.000</div>
-      <div class="point-table-grid">5PBKS 000000.000</div>
+      <div class="point-table-grid">3RR 000000.000</div>
+      <div class="point-table-grid">4PBKS 000000.000</div>
+      <div class="point-table-grid">5KKR 000000.000</div>
 
       <div class="point-table-grid">Group BPWLNRPtsNRR</div>
-      <div class="point-table-grid">1KKR 000000.000</div>
-      <div class="point-table-grid">2RR 000000.000</div>
-      <div class="point-table-grid">3LSG 000000.000</div>
-      <div class="point-table-grid">4GT 000000.000</div>
+      <div class="point-table-grid">1MI 000000.000</div>
+      <div class="point-table-grid">2GT 000000.000</div>
+      <div class="point-table-grid">3DC 000000.000</div>
+      <div class="point-table-grid">4LSG 000000.000</div>
       <div class="point-table-grid">5SRH 10100-1.850</div>
     </body></html>
   `
 
   it('parses Group A and Group B in page order', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: buildPointsTableHTML() })
+    mockEspnFailCricbuzz([{ url: 'points-table', data: buildPointsTableHTML() }])
 
     const result = await scrapeStandings()
     expect(result).not.toBeNull()
@@ -114,7 +129,6 @@ describe('scrapeStandings', () => {
     expect(result![0].group).toBe('Group A')
     expect(result![1].group).toBe('Group B')
 
-    // Verify Group A team details
     const rcb = result![0].teams[0]
     expect(rcb.team).toBe('Royal Challengers Bengaluru')
     expect(rcb.played).toBe(1)
@@ -122,7 +136,6 @@ describe('scrapeStandings', () => {
     expect(rcb.points).toBe(2)
     expect(rcb.nrr).toBe('+1.850')
 
-    // Verify Group B team details
     const srh = result![1].teams[4]
     expect(srh.team).toBe('Sunrisers Hyderabad')
     expect(srh.played).toBe(1)
@@ -138,7 +151,7 @@ describe('scrapeStandings', () => {
         <div class="point-table-grid">1MI (Q)44008+2.500</div>
       </body></html>
     `
-    mockedAxios.get.mockResolvedValueOnce({ data: html })
+    mockEspnFailCricbuzz([{ url: 'points-table', data: html }])
 
     const result = await scrapeStandings()
     const mi = result![0].teams[0]
@@ -147,7 +160,7 @@ describe('scrapeStandings', () => {
   })
 
   it('includes both Group A and Group B', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: buildPointsTableHTML() })
+    mockEspnFailCricbuzz([{ url: 'points-table', data: buildPointsTableHTML() }])
 
     const result = await scrapeStandings()
     const groupNames = result!.map(g => g.group)
@@ -156,14 +169,14 @@ describe('scrapeStandings', () => {
   })
 
   it('returns null on network error', async () => {
-    mockedAxios.get.mockRejectedValueOnce(new Error('Network error'))
+    mockedAxios.get.mockRejectedValue(new Error('Network error'))
 
     const result = await scrapeStandings()
     expect(result).toBeNull()
   })
 
   it('returns null on malformed HTML with no point-table-grid', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: '<html><body><div>No tables here</div></body></html>' })
+    mockEspnFailCricbuzz([{ url: 'points-table', data: '<html><body><div>No tables here</div></body></html>' }])
 
     const result = await scrapeStandings()
     expect(result).toBeNull()
@@ -178,7 +191,7 @@ describe('scrapeStandings', () => {
         <div class="point-table-grid">1KKR 33006+2.100</div>
       </body></html>
     `
-    mockedAxios.get.mockResolvedValueOnce({ data: html })
+    mockEspnFailCricbuzz([{ url: 'points-table', data: html }])
 
     const result = await scrapeStandings()
     expect(result).toHaveLength(1)
@@ -192,7 +205,7 @@ describe('scrapeStandings', () => {
         <div class="point-table-grid">1MI 000000.000</div>
       </body></html>
     `
-    mockedAxios.get.mockResolvedValueOnce({ data: html })
+    mockEspnFailCricbuzz([{ url: 'points-table', data: html }])
 
     const result = await scrapeStandings()
     expect(result![0].teams[0].nrr).toBe('0.000')
@@ -208,7 +221,7 @@ describe('scrapeStandings', () => {
         <div class="point-table-grid">2CSK 000000.000</div>
       </body></html>
     `
-    mockedAxios.get.mockResolvedValueOnce({ data: html })
+    mockEspnFailCricbuzz([{ url: 'points-table', data: html }])
 
     const result = await scrapeStandings()
     expect(result).toHaveLength(1)
@@ -294,13 +307,24 @@ describe('scrapeMatches', () => {
     return `<html><body>${anchors}</body></html>`
   }
 
-  it('separates live, recent, and upcoming matches', async () => {
-    mockedAxios.get.mockResolvedValueOnce({
-      data: buildMatchesHTML([
-        { title: 'Mumbai Indians vs Chennai Super Kings, Match 1 - Mumbai Indians won by 14 runs', href: '/live-cricket-scores/1/indian-premier-league-2026/mi-vs-csk' },
-        { title: 'Royal Challengers Bengaluru vs Kolkata Knight Riders, Match 2 - Starts at 14:00 IST', href: '/live-cricket-scores/2/indian-premier-league-2026/rcb-vs-kkr' },
-      ]),
+  function mockEspnFailCricbuzzMatches(cricbuzzHtml: string) {
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes('hs-consumer-api.espncricinfo.com')) {
+        return Promise.reject(new Error('ESPN unavailable'))
+      }
+      if (url.includes('/matches')) {
+        return Promise.resolve({ data: cricbuzzHtml })
+      }
+      return Promise.resolve({ data: '<html><body></body></html>' })
     })
+  }
+
+  it('separates live, recent, and upcoming matches', async () => {
+    const html = buildMatchesHTML([
+      { title: 'Mumbai Indians vs Chennai Super Kings, Match 1 - Mumbai Indians won by 14 runs', href: '/live-cricket-scores/1/indian-premier-league-2026/mi-vs-csk' },
+      { title: 'Royal Challengers Bengaluru vs Kolkata Knight Riders, Match 2 - Starts at 14:00 IST', href: '/live-cricket-scores/2/indian-premier-league-2026/rcb-vs-kkr' },
+    ])
+    mockEspnFailCricbuzzMatches(html)
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
@@ -313,15 +337,21 @@ describe('scrapeMatches', () => {
   })
 
   it('detects completed, live, and upcoming statuses', async () => {
-    mockedAxios.get.mockResolvedValueOnce({
-      data: buildMatchesHTML([
-        { title: 'Mumbai Indians vs Chennai Super Kings, Match 1 - Mumbai Indians won by 14 runs', href: '/live-cricket-scores/1/indian-premier-league-2026/mi-vs-csk' },
-        { title: 'Sunrisers Hyderabad vs Royal Challengers Bengaluru, Match 2 - SRH batting', href: '/live-cricket-scores/2/indian-premier-league-2026/srh-vs-rcb' },
-        { title: 'Delhi Capitals vs Rajasthan Royals, Match 3 - Tomorrow 14:00', href: '/live-cricket-scores/3/indian-premier-league-2026/dc-vs-rr' },
-      ]),
-    })
-    mockedAxios.get.mockResolvedValueOnce({
-      data: '<html><body><div>SRH97-1(10.4)</div></body></html>',
+    const html = buildMatchesHTML([
+      { title: 'Mumbai Indians vs Chennai Super Kings, Match 1 - Mumbai Indians won by 14 runs', href: '/live-cricket-scores/1/indian-premier-league-2026/mi-vs-csk' },
+      { title: 'Sunrisers Hyderabad vs Royal Challengers Bengaluru, Match 2 - SRH batting', href: '/live-cricket-scores/2/indian-premier-league-2026/srh-vs-rcb' },
+      { title: 'Delhi Capitals vs Rajasthan Royals, Match 3 - Tomorrow 14:00', href: '/live-cricket-scores/3/indian-premier-league-2026/dc-vs-rr' },
+    ])
+
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes('hs-consumer-api.espncricinfo.com')) {
+        return Promise.reject(new Error('ESPN unavailable'))
+      }
+      if (url.includes('/matches')) {
+        return Promise.resolve({ data: html })
+      }
+      // Score page for live match
+      return Promise.resolve({ data: '<html><body><div>SRH97-1(10.4)</div></body></html>' })
     })
 
     const result = await scrapeMatches()
@@ -340,9 +370,7 @@ describe('scrapeMatches', () => {
       href: `/live-cricket-scores/${100 + i}/indian-premier-league-2026/match-${100 + i}`,
     }))
 
-    mockedAxios.get.mockResolvedValueOnce({
-      data: buildMatchesHTML([...completedLinks, ...upcomingLinks]),
-    })
+    mockEspnFailCricbuzzMatches(buildMatchesHTML([...completedLinks, ...upcomingLinks]))
 
     const result = await scrapeMatches()
     expect(result!.recent.length).toBeLessThanOrEqual(3)
@@ -351,25 +379,28 @@ describe('scrapeMatches', () => {
 
   it('deduplicates by href', async () => {
     const href = '/live-cricket-scores/1/indian-premier-league-2026/mi-vs-csk'
-    mockedAxios.get.mockResolvedValueOnce({
-      data: buildMatchesHTML([
-        { title: 'Mumbai Indians vs Chennai Super Kings, Match 1 - MI won by 14 runs', href },
-        { title: 'Mumbai Indians vs Chennai Super Kings, Match 1 - MI won by 14 runs', href },
-      ]),
-    })
+    mockEspnFailCricbuzzMatches(buildMatchesHTML([
+      { title: 'Mumbai Indians vs Chennai Super Kings, Match 1 - MI won by 14 runs', href },
+      { title: 'Mumbai Indians vs Chennai Super Kings, Match 1 - MI won by 14 runs', href },
+    ]))
 
     const result = await scrapeMatches()
     expect(result!.recent).toHaveLength(1)
   })
 
   it('correctly attributes live scores to the right team', async () => {
-    mockedAxios.get.mockResolvedValueOnce({
-      data: buildMatchesHTML([
-        { title: 'Royal Challengers Bengaluru vs Sunrisers Hyderabad, Match 5 - SRH batting', href: '/live-cricket-scores/5/indian-premier-league-2026/rcb-vs-srh' },
-      ]),
-    })
-    mockedAxios.get.mockResolvedValueOnce({
-      data: '<html><body><div>SRH97-1(10.4)</div></body></html>',
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes('hs-consumer-api.espncricinfo.com')) {
+        return Promise.reject(new Error('ESPN unavailable'))
+      }
+      if (url.includes('/matches')) {
+        return Promise.resolve({
+          data: buildMatchesHTML([
+            { title: 'Royal Challengers Bengaluru vs Sunrisers Hyderabad, Match 5 - SRH batting', href: '/live-cricket-scores/5/indian-premier-league-2026/rcb-vs-srh' },
+          ]),
+        })
+      }
+      return Promise.resolve({ data: '<html><body><div>SRH97-1(10.4)</div></body></html>' })
     })
 
     const result = await scrapeMatches()
@@ -381,12 +412,10 @@ describe('scrapeMatches', () => {
   })
 
   it('filters out non-IPL series hrefs', async () => {
-    mockedAxios.get.mockResolvedValueOnce({
-      data: buildMatchesHTML([
-        { title: 'India vs Australia, Test Match 1 - India won by 14 runs', href: '/live-cricket-scores/1/icc-test-championship/ind-vs-aus' },
-        { title: 'Mumbai Indians vs Chennai Super Kings, Match 1 - MI won by 20 runs', href: '/live-cricket-scores/2/indian-premier-league-2026/mi-vs-csk' },
-      ]),
-    })
+    mockEspnFailCricbuzzMatches(buildMatchesHTML([
+      { title: 'India vs Australia, Test Match 1 - India won by 14 runs', href: '/live-cricket-scores/1/icc-test-championship/ind-vs-aus' },
+      { title: 'Mumbai Indians vs Chennai Super Kings, Match 1 - MI won by 20 runs', href: '/live-cricket-scores/2/indian-premier-league-2026/mi-vs-csk' },
+    ]))
 
     const result = await scrapeMatches()
     expect(result!.recent).toHaveLength(1)
@@ -394,12 +423,10 @@ describe('scrapeMatches', () => {
   })
 
   it('skips match titles that do not match expected format', async () => {
-    mockedAxios.get.mockResolvedValueOnce({
-      data: buildMatchesHTML([
-        { title: 'No separator here at all', href: '/live-cricket-scores/1/indian-premier-league-2026/match-1' },
-        { title: 'Mumbai Indians vs Chennai Super Kings, Match 2 - MI won by 14 runs', href: '/live-cricket-scores/2/indian-premier-league-2026/mi-vs-csk' },
-      ]),
-    })
+    mockEspnFailCricbuzzMatches(buildMatchesHTML([
+      { title: 'No separator here at all', href: '/live-cricket-scores/1/indian-premier-league-2026/match-1' },
+      { title: 'Mumbai Indians vs Chennai Super Kings, Match 2 - MI won by 14 runs', href: '/live-cricket-scores/2/indian-premier-league-2026/mi-vs-csk' },
+    ]))
 
     const result = await scrapeMatches()
     expect(result!.recent).toHaveLength(1)
@@ -407,7 +434,7 @@ describe('scrapeMatches', () => {
   })
 
   it('returns empty arrays when no matches are found', async () => {
-    mockedAxios.get.mockResolvedValueOnce({ data: '<html><body></body></html>' })
+    mockEspnFailCricbuzzMatches('<html><body></body></html>')
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
@@ -417,11 +444,9 @@ describe('scrapeMatches', () => {
   })
 
   it('sets result field for completed matches and venue from matchInfo', async () => {
-    mockedAxios.get.mockResolvedValueOnce({
-      data: buildMatchesHTML([
-        { title: 'Mumbai Indians vs Chennai Super Kings, 1st Match Group A - MI won by 14 runs', href: '/live-cricket-scores/1/indian-premier-league-2026/mi-vs-csk' },
-      ]),
-    })
+    mockEspnFailCricbuzzMatches(buildMatchesHTML([
+      { title: 'Mumbai Indians vs Chennai Super Kings, 1st Match Group A - MI won by 14 runs', href: '/live-cricket-scores/1/indian-premier-league-2026/mi-vs-csk' },
+    ]))
 
     const result = await scrapeMatches()
     const match = result!.recent[0]
@@ -431,13 +456,18 @@ describe('scrapeMatches', () => {
   })
 
   it('attributes both team scores to the correct teams', async () => {
-    mockedAxios.get.mockResolvedValueOnce({
-      data: buildMatchesHTML([
-        { title: 'Mumbai Indians vs Chennai Super Kings, Match 3 - MI batting', href: '/live-cricket-scores/3/indian-premier-league-2026/mi-vs-csk' },
-      ]),
-    })
-    mockedAxios.get.mockResolvedValueOnce({
-      data: '<html><body><div>CSK186-4(20)</div><div>MI45-2(6.3)</div></body></html>',
+    mockedAxios.get.mockImplementation((url: string) => {
+      if (url.includes('hs-consumer-api.espncricinfo.com')) {
+        return Promise.reject(new Error('ESPN unavailable'))
+      }
+      if (url.includes('/matches')) {
+        return Promise.resolve({
+          data: buildMatchesHTML([
+            { title: 'Mumbai Indians vs Chennai Super Kings, Match 3 - MI batting', href: '/live-cricket-scores/3/indian-premier-league-2026/mi-vs-csk' },
+          ]),
+        })
+      }
+      return Promise.resolve({ data: '<html><body><div>CSK186-4(20)</div><div>MI45-2(6.3)</div></body></html>' })
     })
 
     const result = await scrapeMatches()
@@ -447,7 +477,7 @@ describe('scrapeMatches', () => {
   })
 
   it('returns null on network error', async () => {
-    mockedAxios.get.mockRejectedValueOnce(new Error('Network error'))
+    mockedAxios.get.mockRejectedValue(new Error('Network error'))
 
     const result = await scrapeMatches()
     expect(result).toBeNull()

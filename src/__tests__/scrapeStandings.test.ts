@@ -8,6 +8,16 @@ function buildStandingsPage(rows: string[]): string {
   return `<html><body>${rows.map(r => `<div class="point-table-grid">${r}</div>`).join('\n')}</body></html>`
 }
 
+// ESPN API returns empty/error so tests exercise the Cricbuzz fallback path
+function mockEspnFailCricbuzzSuccess(cricbuzzHtml: string) {
+  mockedAxios.get.mockImplementation((url: string) => {
+    if (url.includes('hs-consumer-api.espncricinfo.com')) {
+      return Promise.reject(new Error('ESPN unavailable'))
+    }
+    return Promise.resolve({ data: cricbuzzHtml })
+  })
+}
+
 describe('scrapeStandings', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -20,7 +30,7 @@ describe('scrapeStandings', () => {
       '2CSK 31202+0.500',
     ])
 
-    mockedAxios.get.mockResolvedValue({ data: html })
+    mockEspnFailCricbuzzSuccess(html)
 
     const result = await scrapeStandings()
     expect(result).not.toBeNull()
@@ -46,7 +56,7 @@ describe('scrapeStandings', () => {
       '1KKR 33004+2.000',
     ])
 
-    mockedAxios.get.mockResolvedValue({ data: html })
+    mockEspnFailCricbuzzSuccess(html)
 
     const result = await scrapeStandings()
     expect(result).not.toBeNull()
@@ -62,7 +72,7 @@ describe('scrapeStandings', () => {
       '2KKR 33004+2.000',
     ])
 
-    mockedAxios.get.mockResolvedValue({ data: html })
+    mockEspnFailCricbuzzSuccess(html)
 
     const result = await scrapeStandings()
     expect(result).not.toBeNull()
@@ -77,7 +87,7 @@ describe('scrapeStandings', () => {
       '1MI (Q)44008+2.500',
     ])
 
-    mockedAxios.get.mockResolvedValue({ data: html })
+    mockEspnFailCricbuzzSuccess(html)
 
     const result = await scrapeStandings()
     expect(result).not.toBeNull()
@@ -95,7 +105,7 @@ describe('scrapeStandings', () => {
       '1MI 32102+1.200',
     ])
 
-    mockedAxios.get.mockResolvedValue({ data: html })
+    mockEspnFailCricbuzzSuccess(html)
 
     const result = await scrapeStandings()
     expect(result).not.toBeNull()
@@ -110,7 +120,7 @@ describe('scrapeStandings', () => {
   })
 
   it('returns null for empty page', async () => {
-    mockedAxios.get.mockResolvedValue({ data: '<html><body></body></html>' })
+    mockEspnFailCricbuzzSuccess('<html><body></body></html>')
 
     const result = await scrapeStandings()
     expect(result).toBeNull()

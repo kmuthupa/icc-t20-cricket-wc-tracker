@@ -14,6 +14,20 @@ function buildMatchesPage(links: string[]): string {
   return `<html><body>${links.join('\n')}</body></html>`
 }
 
+// ESPN API returns empty/error so tests exercise the Cricbuzz fallback path
+function mockEspnFailCricbuzzSuccess(cricbuzzHtml: string) {
+  mockedAxios.get.mockImplementation((url: string) => {
+    if (url.includes('hs-consumer-api.espncricinfo.com')) {
+      return Promise.reject(new Error('ESPN unavailable'))
+    }
+    if (url.includes('/matches')) {
+      return Promise.resolve({ data: cricbuzzHtml })
+    }
+    // Live score page
+    return Promise.resolve({ data: '<html><body></body></html>' })
+  })
+}
+
 describe('scrapeMatches', () => {
   beforeEach(() => {
     jest.clearAllMocks()
@@ -35,12 +49,7 @@ describe('scrapeMatches', () => {
       ),
     ])
 
-    mockedAxios.get.mockImplementation((url: string) => {
-      if (url.includes('/matches')) {
-        return Promise.resolve({ data: html })
-      }
-      return Promise.resolve({ data: '<html><body></body></html>' })
-    })
+    mockEspnFailCricbuzzSuccess(html)
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
@@ -74,7 +83,7 @@ describe('scrapeMatches', () => {
       ),
     ])
 
-    mockedAxios.get.mockResolvedValue({ data: html })
+    mockEspnFailCricbuzzSuccess(html)
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
@@ -95,7 +104,7 @@ describe('scrapeMatches', () => {
       )
     )
 
-    mockedAxios.get.mockResolvedValue({ data: buildMatchesPage(links) })
+    mockEspnFailCricbuzzSuccess(buildMatchesPage(links))
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
@@ -110,7 +119,7 @@ describe('scrapeMatches', () => {
       )
     )
 
-    mockedAxios.get.mockResolvedValue({ data: buildMatchesPage(links) })
+    mockEspnFailCricbuzzSuccess(buildMatchesPage(links))
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
@@ -125,9 +134,7 @@ describe('scrapeMatches', () => {
       )
     )
 
-    mockedAxios.get.mockImplementation(() =>
-      Promise.resolve({ data: buildMatchesPage(links) })
-    )
+    mockEspnFailCricbuzzSuccess(buildMatchesPage(links))
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
@@ -146,9 +153,7 @@ describe('scrapeMatches', () => {
       ),
     ])
 
-    mockedAxios.get.mockImplementation(() =>
-      Promise.resolve({ data: html })
-    )
+    mockEspnFailCricbuzzSuccess(html)
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
@@ -163,7 +168,7 @@ describe('scrapeMatches', () => {
       ),
     ])
 
-    mockedAxios.get.mockResolvedValue({ data: html })
+    mockEspnFailCricbuzzSuccess(html)
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
@@ -195,9 +200,7 @@ describe('scrapeMatches', () => {
       ),
     ])
 
-    mockedAxios.get.mockImplementation(() =>
-      Promise.resolve({ data: html })
-    )
+    mockEspnFailCricbuzzSuccess(html)
 
     const result = await scrapeMatches()
     expect(result).not.toBeNull()
