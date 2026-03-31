@@ -85,7 +85,7 @@ async function fetchCricbuzzStandings(): Promise<GroupStandings[] | null> {
 
     const $ = cheerio.load(data)
     const groups: GroupStandings[] = []
-    let currentGroupName = ''
+    let currentGroupName = 'Points Table'
     let currentTeams: TeamStanding[] = []
 
     $('.point-table-grid').each((_, row) => {
@@ -93,7 +93,7 @@ async function fetchCricbuzzStandings(): Promise<GroupStandings[] | null> {
 
       const groupMatch = text.match(/^(Group [A-Z]|Points Table)/)
       if (groupMatch) {
-        if (currentGroupName && currentTeams.length > 0) {
+        if (currentTeams.length > 0) {
           groups.push({ group: currentGroupName, teams: currentTeams })
         }
         currentGroupName = groupMatch[1]
@@ -117,7 +117,7 @@ async function fetchCricbuzzStandings(): Promise<GroupStandings[] | null> {
       }
     })
 
-    if (currentGroupName && currentTeams.length > 0) {
+    if (currentTeams.length > 0) {
       groups.push({ group: currentGroupName, teams: currentTeams })
     }
 
@@ -272,17 +272,20 @@ async function fetchCricbuzzMatches(): Promise<{ live: Match[], recent: Match[],
     const live: Match[] = []
     const recent: Match[] = []
     const upcoming: Match[] = []
-    const seenHrefs = new Set<string>()
+    const seenMatchIds = new Set<string>()
     const liveMatchUrls: { match: Match, href: string }[] = []
 
     $('a[href*="/live-cricket-scores/"]').each((index, el) => {
       const title = $(el).attr('title') || ''
       const href = $(el).attr('href') || ''
 
-      if (seenHrefs.has(href)) return
-      seenHrefs.add(href)
+      // Deduplicate by match ID (numeric segment after /live-cricket-scores/)
+      const matchIdMatch = href.match(/\/live-cricket-scores\/(\d+)\//)
+      const matchId = matchIdMatch ? matchIdMatch[1] : href
+      if (seenMatchIds.has(matchId)) return
+      seenMatchIds.add(matchId)
 
-      if (!href.includes(CRICBUZZ_SERIES_SLUG) && !title.toLowerCase().includes('indian premier league')) {
+      if (!href.includes(CRICBUZZ_SERIES_SLUG) && !href.includes('ipl-2026') && !title.toLowerCase().includes('indian premier league')) {
         return
       }
 
