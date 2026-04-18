@@ -483,3 +483,73 @@ describe('scrapeMatches', () => {
     expect(result).toBeNull()
   })
 })
+
+// ─── ESPN Match Scraping ─────────────────────────────────────────────────────
+
+describe('scrapeMatches - ESPN API', () => {
+  beforeEach(() => jest.clearAllMocks())
+
+  it('extracts win probability from prediction field', async () => {
+    const espnData = {
+      matches: [{
+        series: { objectId: '1510719', slug: 'ipl-2026' },
+        match: {
+          objectId: '123',
+          teams: [
+            { team: { longName: 'Mumbai Indians', id: '1' } },
+            { team: { longName: 'Chennai Super Kings', id: '2' } }
+          ],
+          state: 'LIVE',
+          statusText: 'MI need 10 runs',
+          prediction: {
+            winProbability: {
+              team1Percentage: 65.5,
+              team2Percentage: 34.5
+            }
+          }
+        }
+      }]
+    }
+
+    mockedAxios.get.mockResolvedValueOnce({ data: espnData })
+
+    const result = await scrapeMatches()
+    expect(result!.live).toHaveLength(1)
+    expect(result!.live[0].winProbability).toEqual({
+      team1: 65.5,
+      team2: 34.5,
+      source: 'ESPNCricinfo'
+    })
+  })
+
+  it('extracts win probability from homeWinPercentage/awayWinPercentage', async () => {
+    const espnData = {
+      matches: [{
+        series: { objectId: '1510719' },
+        match: {
+          objectId: '124',
+          teams: [
+            { team: { longName: 'Gujarat Titans' } },
+            { team: { longName: 'Delhi Capitals' } }
+          ],
+          state: 'LIVE',
+          liveScene: {
+            winProbability: {
+              homeWinPercentage: 40,
+              awayWinPercentage: 60
+            }
+          }
+        }
+      }]
+    }
+
+    mockedAxios.get.mockResolvedValueOnce({ data: espnData })
+
+    const result = await scrapeMatches()
+    expect(result!.live[0].winProbability).toEqual({
+      team1: 40,
+      team2: 60,
+      source: 'ESPNCricinfo'
+    })
+  })
+})

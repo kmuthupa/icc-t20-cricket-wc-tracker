@@ -13,6 +13,12 @@ export interface GroupStandings {
   teams: TeamStanding[]
 }
 
+export interface WinProbability {
+  team1: number
+  team2: number
+  source?: string
+}
+
 export interface Match {
   id: string
   team1: string
@@ -23,6 +29,7 @@ export interface Match {
   venue: string
   time: string
   status: 'completed' | 'live' | 'upcoming'
+  winProbability?: WinProbability
 }
 
 export const mockStandings: GroupStandings[] = [
@@ -48,7 +55,23 @@ export const mockStandings: GroupStandings[] = [
   },
 ]
 
-export const mockLiveMatches: Match[] = []
+export const mockLiveMatches: Match[] = [
+  {
+    id: 'live-1',
+    team1: 'Mumbai Indians',
+    team2: 'Chennai Super Kings',
+    team1Score: '145/3 (15.2)',
+    team2Score: '',
+    venue: 'Wankhede Stadium, Mumbai',
+    time: 'Live',
+    status: 'live',
+    winProbability: {
+      team1: 62,
+      team2: 38,
+      source: 'ESPNCricinfo'
+    }
+  }
+]
 
 export const mockRecentResults: Match[] = [
   {

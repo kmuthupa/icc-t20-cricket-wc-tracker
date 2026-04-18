@@ -189,6 +189,39 @@ td {
   font-variant-numeric: tabular-nums;
 }
 
+.probability-container {
+  margin: 0.75rem 0 0.5rem;
+}
+
+.probability-bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  display: flex;
+  overflow: hidden;
+  margin-bottom: 0.4rem;
+}
+
+.probability-team1 {
+  height: 100%;
+  background: var(--live);
+  transition: width 0.5s ease-in-out;
+}
+
+.probability-team2 {
+  height: 100%;
+  background: var(--upcoming-text);
+  transition: width 0.5s ease-in-out;
+}
+
+.probability-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
 .match-details {
   font-size: 0.8rem;
   color: var(--text-secondary);

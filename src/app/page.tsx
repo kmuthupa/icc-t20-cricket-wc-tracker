@@ -55,7 +55,8 @@ export default function Home() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await fetch('/api/cricket')
+      // Use cache: 'no-store' and a timestamp to ensure fresh data
+      const res = await fetch(`/api/cricket?t=${Date.now()}`, { cache: 'no-store' })
       if (!res.ok) throw new Error('Failed to fetch data')
       const json = await res.json()
       setData(json)
@@ -69,9 +70,40 @@ export default function Home() {
 
   useEffect(() => {
     fetchData()
-    const interval = setInterval(fetchData, 2 * 60 * 1000)
-    return () => clearInterval(interval)
-  }, [fetchData])
+    
+    // Adaptive polling: 30s if live matches exist, 2m otherwise
+    const getInterval = () => {
+      const hasLive = data?.liveMatches && data.liveMatches.length > 0
+      return hasLive ? 30 * 1000 : 120 * 1000
+    }
+
+    let timerId: NodeJS.Timeout
+    
+    const scheduleNext = () => {
+      if (timerId) clearTimeout(timerId)
+      timerId = setTimeout(() => {
+        if (document.visibilityState === 'visible') {
+          fetchData().then(scheduleNext)
+        } else {
+          scheduleNext()
+        }
+      }, getInterval())
+    }
+
+    scheduleNext()
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchData()
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => {
+      if (timerId) clearTimeout(timerId)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [fetchData, data?.liveMatches?.length])
 
   if (loading) {
     return (
@@ -80,6 +112,8 @@ export default function Home() {
       </div>
     )
   }
+
+  const isLive = data?.liveMatches && data.liveMatches.length > 0
 
   return (
     <div className="container">
@@ -116,6 +150,24 @@ export default function Home() {
                     <div className="match-score">
                       {match.team1}: {match.team1Score}
                       {match.team2Score && <> · {match.team2}: {match.team2Score}</>}
+                    </div>
+                  )}
+                  {match.winProbability && (
+                    <div className="probability-container">
+                      <div className="probability-bar">
+                        <div 
+                          className="probability-team1" 
+                          style={{ width: `${match.winProbability.team1}%` }}
+                        />
+                        <div 
+                          className="probability-team2" 
+                          style={{ width: `${match.winProbability.team2}%` }}
+                        />
+                      </div>
+                      <div className="probability-labels">
+                        <span>{match.winProbability.team1}% {match.team1}</span>
+                        <span>{match.team2} {match.winProbability.team2}%</span>
+                      </div>
                     </div>
                   )}
                   <div className="match-details">{match.venue}</div>
@@ -175,7 +227,7 @@ export default function Home() {
       {data?.lastUpdated && (
         <div className="last-updated">
           Last updated: {new Date(data.lastUpdated).toLocaleTimeString()}
-          {' · '}Auto-refreshes every 2 minutes
+          {' · '}Auto-refreshes every {isLive ? '30 seconds' : '2 minutes'}
         </div>
       )}
     </div>

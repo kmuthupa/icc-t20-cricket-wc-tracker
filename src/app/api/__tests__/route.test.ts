@@ -42,6 +42,34 @@ describe('GET /api/cricket', () => {
     expect(data.upcomingMatches).toEqual(liveMatches.upcoming)
   })
 
+  it('passes through winProbability in live matches', async () => {
+    const liveMatches = {
+      live: [{ 
+        id: '1', 
+        team1: 'Mumbai Indians', 
+        team2: 'Chennai Super Kings', 
+        venue: 'Wankhede', 
+        time: '', 
+        status: 'live' as const,
+        winProbability: { team1: 60, team2: 40, source: 'ESPNCricinfo' }
+      }],
+      recent: [],
+      upcoming: [],
+    }
+
+    mockedScrapeStandings.mockResolvedValueOnce([])
+    mockedScrapeMatches.mockResolvedValueOnce(liveMatches)
+
+    const response = await GET()
+    const data = await response.json()
+
+    expect(data.liveMatches[0].winProbability).toEqual({
+      team1: 60,
+      team2: 40,
+      source: 'ESPNCricinfo'
+    })
+  })
+
   it('falls back to mock data when scraping fails', async () => {
     mockedScrapeStandings.mockResolvedValueOnce(null)
     mockedScrapeMatches.mockResolvedValueOnce(null)

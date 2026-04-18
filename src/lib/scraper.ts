@@ -212,6 +212,21 @@ async function fetchEspnMatches(): Promise<{ live: Match[], recent: Match[], upc
         result: status === 'completed' ? statusText : undefined,
       }
 
+      // Extract win probability if available (ESPN API often has it in liveScene or prediction)
+      const probData = (match.liveScene || match.prediction || m.prediction || match) as Record<string, any>
+      const winProb = probData.winProbability || probData.probability
+      if (winProb && typeof winProb === 'object') {
+        const team1Prob = winProb.team1Percentage || winProb.homeWinPercentage || winProb.team1
+        const team2Prob = winProb.team2Percentage || winProb.awayWinPercentage || winProb.team2
+        if (typeof team1Prob === 'number' && typeof team2Prob === 'number') {
+          matchObj.winProbability = {
+            team1: team1Prob,
+            team2: team2Prob,
+            source: 'ESPNCricinfo'
+          }
+        }
+      }
+
       // Extract scores from innings data if available
       const innings = (m.innings || match.innings || (m as Record<string, unknown>).scorecard || []) as Record<string, unknown>[]
       if (Array.isArray(innings)) {

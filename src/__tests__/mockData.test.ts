@@ -50,6 +50,16 @@ describe('mockData', () => {
         expect(match.venue).toBeDefined()
       })
     })
+
+    it('validates winProbability if present', () => {
+      mockLiveMatches.forEach(match => {
+        if (match.winProbability) {
+          expect(typeof match.winProbability.team1).toBe('number')
+          expect(typeof match.winProbability.team2).toBe('number')
+          expect(match.winProbability.team1 + match.winProbability.team2).toBeLessThanOrEqual(100)
+        }
+      })
+    })
   })
 
   describe('mockRecentResults', () => {
