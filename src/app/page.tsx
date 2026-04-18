@@ -113,7 +113,7 @@ export default function Home() {
     )
   }
 
-  const isLive = data?.liveMatches && data.liveMatches.length > 0
+  const isLive = (data?.liveMatches?.length ?? 0) > 0
 
   return (
     <div className="container">
