@@ -59,20 +59,57 @@ async function fetchCricbuzzStandings(seriesId: string, leagueSlug: string): Pro
     const { data } = await axios.get(url, { headers, timeout: 15000 })
     const $ = cheerio.load(data), groups: GroupStandings[] = []
     let currentGroupName = 'Points Table', currentTeams: TeamStanding[] = []
+
     $('.point-table-grid').each((_, row) => {
-      const text = $(row).text().trim().replace(/\s+/g, ' ')
-      const groupMatch = text.match(/^(Group [A-Z]|Points Table)/)
-      if (groupMatch) {
+      const text = $(row).text().trim()
+      
+      if (text.startsWith('Group') || text.startsWith('Points Table')) {
         if (currentTeams.length > 0) groups.push({ group: currentGroupName, teams: currentTeams })
-        currentGroupName = groupMatch[1]; currentTeams = []; return
+        currentGroupName = text.split(/\s+/)[0] + (text.includes('Table') ? ' Table' : ' ' + text.split(/\s+/)[1])
+        currentTeams = []
+        return
       }
-      if (text.includes('PWL') || text.includes('NRPts')) return
-      const teamMatch = text.match(/^(\d+)([A-Z]+)\s+(?:\([A-Z]\))?(\d)(\d)(\d)(\d)(\d)([-+]?\d+\.\d+)$/)
-      if (teamMatch) {
+
+      if (text.includes('PWL') || text.includes('NRPts') || text.includes('NRR')) return
+
+      // Robust extraction: normalize spaces and split
+      // Position is usually first, then Team name/abbr, then stats
+      const normalized = text.replace(/(\d+)([A-Z]{2,})/, '$1 $2') // "1MI" -> "1 MI"
+                            .replace(/([A-Z]{2,})(\d+)/, '$1 $2') // "MI10" -> "MI 10"
+                            .replace(/(\d+)([+-]\d+\.\d+)/, '$1 $2') // "10+1.20" -> "10 +1.20"
+                            .replace(/([+-]\d+\.\d+)(\d+)/, '$1 $2') // "+1.2010" -> "+1.20 10"
+
+      const parts = normalized.split(/\s+/)
+      if (parts.length >= 6) {
+        const pos = parseInt(parts[0])
+        if (isNaN(pos)) return
+
+        const team = expandTeamName(parts[1])
+        
+        // Find NRR (the float)
+        const nrrIdx = parts.findIndex(p => p.includes('.') && (p.includes('+') || p.includes('-') || p.match(/^\d/)))
+        const nrr = nrrIdx !== -1 ? parts[nrrIdx] : '0.000'
+        
+        // Identify numeric stats around NRR
+        // Common Cricbuzz order: P, W, L, NR, Pts, NRR  OR  P, W, L, NRR, Pts
+        // In the screenshot: P(2), W(3), L(4), NRR(5), PTS(6)
+        const played = parseInt(parts[2]) || 0
+        const won = parseInt(parts[3]) || 0
+        const lost = parseInt(parts[4]) || 0
+        
+        // If NRR is part 5, Pts is part 6
+        let points = 0
+        if (nrrIdx === 5) {
+          points = parseInt(parts[6]) || 0
+        } else {
+          // Fallback to searching for the highest numeric part remaining
+          points = parseInt(parts[parts.length - 1]) || 0
+        }
+
         currentTeams.push({
-          position: parseInt(teamMatch[1]), team: expandTeamName(teamMatch[2]),
-          played: parseInt(teamMatch[3]), won: parseInt(teamMatch[4]),
-          lost: parseInt(teamMatch[5]), nrr: teamMatch[8], points: parseInt(teamMatch[7]),
+          position: pos, team,
+          played, won, lost,
+          nrr, points
         })
       }
     })
@@ -101,18 +138,11 @@ async function fetchEspnMatches(seriesId: string, leagueSlug: string): Promise<{
       const match = m.match || m; const teams = match.teams || []
       if (teams.length < 2) continue
       const t1 = teams[0].team || teams[0]; const t2 = teams[1].team || teams[1]
-      const state = String(match.state || m.state || '').toUpperCase()
-      const stage = String(match.stage || m.stage || '').toUpperCase()
-      const statusText = match.statusText || ''
-      let status: 'completed' | 'live' | 'upcoming'
-      if (state === 'LIVE' || stage === 'RUNNING') status = 'live'
-      else if (state === 'POST' || state === 'FINISHED' || state === 'COMPLETE' || stage === 'FINISHED') status = 'completed'
-      else if (state === 'PRE' || state === 'UPCOMING' || stage === 'SCHEDULED') status = 'upcoming'
-      else status = parseStatus(statusText)
+      const status = parseStatus(match.statusText || '')
       const matchObj: Match = {
         id: `espn-${match.objectId || match.id}`, team1: t1.longName || t1.name, team2: t2.longName || t2.name,
         venue: match.ground?.name || match.title || 'Unknown', time: match.startTime || '', status,
-        result: status === 'completed' ? statusText : undefined,
+        result: status === 'completed' ? match.statusText : undefined,
       }
       const prob = match.prediction?.winProbability || match.liveScene?.winProbability
       if (prob) matchObj.winProbability = { team1: prob.team1Percentage || prob.homeWinPercentage, team2: prob.team2Percentage || prob.awayWinPercentage, source: 'ESPNCricinfo' }
