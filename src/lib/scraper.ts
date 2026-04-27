@@ -2,430 +2,172 @@ import axios from 'axios'
 import * as cheerio from 'cheerio'
 import { TeamStanding, GroupStandings, Match } from './mockData'
 
-// ESPNCricinfo API (primary — no Cloudflare)
 const ESPN_API = 'https://hs-consumer-api.espncricinfo.com'
-const ESPN_SERIES_ID = '1510719' // IPL 2026 on ESPNCricinfo
-
-// Cricbuzz (fallback — may be blocked by Cloudflare)
+const DEFAULT_ESPN_ID = '1510719' 
 const CRICBUZZ_BASE = 'https://www.cricbuzz.com'
-const CRICBUZZ_SERIES_ID = '9241'
-const CRICBUZZ_SERIES_SLUG = 'indian-premier-league-2026'
+const DEFAULT_CB_ID = '9241'
+const DEFAULT_SLUG = 'indian-premier-league'
 
 const headers = {
   'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36',
-  'Accept': 'application/json, text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+  'Accept': 'application/json, text/plain, */*',
   'Accept-Language': 'en-US,en;q=0.9',
+  'Origin': 'https://www.espncricinfo.com',
+  'Referer': 'https://www.espncricinfo.com/',
 }
 
-// ─── Standings ──────────────────────────────────────────────────────────────
-
-export async function scrapeStandings(): Promise<GroupStandings[] | null> {
-  // Try ESPN API first, then Cricbuzz fallback
-  const espnResult = await fetchEspnStandings()
+export async function scrapeStandings(seriesId: string = DEFAULT_ESPN_ID, leagueSlug: string = DEFAULT_SLUG, cricbuzzSeriesId: string = DEFAULT_CB_ID): Promise<GroupStandings[] | null> {
+  const espnResult = await fetchEspnStandings(seriesId)
   if (espnResult) return espnResult
-
-  const cricbuzzResult = await fetchCricbuzzStandings()
-  if (cricbuzzResult) return cricbuzzResult
-
-  return null
+  return await fetchCricbuzzStandings(cricbuzzSeriesId, leagueSlug)
 }
 
-async function fetchEspnStandings(): Promise<GroupStandings[] | null> {
+async function fetchEspnStandings(seriesId: string): Promise<GroupStandings[] | null> {
   try {
-    const url = `${ESPN_API}/v1/pages/series/standings?lang=en&seriesId=${ESPN_SERIES_ID}`
+    const url = `${ESPN_API}/v1/pages/series/standings?lang=en&seriesId=${seriesId}`
     const { data } = await axios.get(url, { headers, timeout: 15000 })
-
-    // ESPNCricinfo standings response has standings data nested in content
     const standings = data?.content?.standings || data?.standings
     if (!standings) return null
-
-    // Handle grouped format (Group A, Group B)
     const groups: GroupStandings[] = []
-
-    // The API may return groups array or a flat list
     const groupsData = standings.groups || standings
     if (Array.isArray(groupsData)) {
       for (const group of groupsData) {
         const groupName = group.name || group.groupName || 'Points Table'
         const teamStats = group.teamStats || group.teams || group.standings || []
-
-        const teams: TeamStanding[] = teamStats.map((entry: Record<string, unknown>, idx: number) => {
-          // Handle nested team info or flat structure
-          const teamInfo = (entry.teamInfo || entry.team || {}) as Record<string, unknown>
-          const teamName = (teamInfo.name || teamInfo.longName || entry.teamName || 'Unknown') as string
-
+        const teams: TeamStanding[] = teamStats.map((entry: any, idx: number) => {
+          const teamInfo = entry.teamInfo || entry.team || {}
           return {
-            position: ((entry.position || entry.rank || idx + 1) as number),
-            team: teamName,
-            played: ((entry.matchesPlayed || entry.played || entry.matches || 0) as number),
-            won: ((entry.matchesWon || entry.won || entry.wins || 0) as number),
-            lost: ((entry.matchesLost || entry.lost || entry.losses || 0) as number),
+            position: entry.position || entry.rank || idx + 1,
+            team: teamInfo.name || teamInfo.longName || entry.teamName || 'Unknown',
+            played: entry.matchesPlayed || entry.played || entry.matches || 0,
+            won: entry.matchesWon || entry.won || entry.wins || 0,
+            lost: entry.matchesLost || entry.lost || entry.losses || 0,
             nrr: String(entry.nrr || entry.netRunRate || '0.000'),
-            points: ((entry.points || entry.pts || 0) as number),
+            points: entry.points || entry.pts || 0,
           }
         })
-
-        if (teams.length > 0) {
-          groups.push({ group: groupName, teams })
-        }
+        if (teams.length > 0) groups.push({ group: groupName, teams })
       }
     }
-
     return groups.length > 0 ? groups : null
-  } catch (error) {
-    console.error('ESPN standings failed:', error instanceof Error ? error.message : error)
-    return null
-  }
+  } catch { return null }
 }
 
-async function fetchCricbuzzStandings(): Promise<GroupStandings[] | null> {
+async function fetchCricbuzzStandings(seriesId: string, leagueSlug: string): Promise<GroupStandings[] | null> {
   try {
-    const url = `${CRICBUZZ_BASE}/cricket-series/${CRICBUZZ_SERIES_ID}/${CRICBUZZ_SERIES_SLUG}/points-table`
+    const url = `${CRICBUZZ_BASE}/cricket-series/${seriesId}/${leagueSlug}-2026/points-table`
     const { data } = await axios.get(url, { headers, timeout: 15000 })
-
-    const $ = cheerio.load(data)
-    const groups: GroupStandings[] = []
-    let currentGroupName = 'Points Table'
-    let currentTeams: TeamStanding[] = []
-
+    const $ = cheerio.load(data), groups: GroupStandings[] = []
+    let currentGroupName = 'Points Table', currentTeams: TeamStanding[] = []
     $('.point-table-grid').each((_, row) => {
       const text = $(row).text().trim().replace(/\s+/g, ' ')
-
       const groupMatch = text.match(/^(Group [A-Z]|Points Table)/)
       if (groupMatch) {
-        if (currentTeams.length > 0) {
-          groups.push({ group: currentGroupName, teams: currentTeams })
-        }
-        currentGroupName = groupMatch[1]
-        currentTeams = []
-        return
+        if (currentTeams.length > 0) groups.push({ group: currentGroupName, teams: currentTeams })
+        currentGroupName = groupMatch[1]; currentTeams = []; return
       }
-
       if (text.includes('PWL') || text.includes('NRPts')) return
-
       const teamMatch = text.match(/^(\d+)([A-Z]+)\s+(?:\([A-Z]\))?(\d)(\d)(\d)(\d)(\d)([-+]?\d+\.\d+)$/)
-      if (teamMatch && currentGroupName) {
+      if (teamMatch) {
         currentTeams.push({
-          position: parseInt(teamMatch[1]),
-          team: expandTeamName(teamMatch[2]),
-          played: parseInt(teamMatch[3]) || 0,
-          won: parseInt(teamMatch[4]) || 0,
-          lost: parseInt(teamMatch[5]) || 0,
-          nrr: teamMatch[8],
-          points: parseInt(teamMatch[7]) || 0,
+          position: parseInt(teamMatch[1]), team: expandTeamName(teamMatch[2]),
+          played: parseInt(teamMatch[3]), won: parseInt(teamMatch[4]),
+          lost: parseInt(teamMatch[5]), nrr: teamMatch[8], points: parseInt(teamMatch[7]),
         })
       }
     })
-
-    if (currentTeams.length > 0) {
-      groups.push({ group: currentGroupName, teams: currentTeams })
-    }
-
-    const mainGroups = groups.filter(g => g.group.startsWith('Group') || g.group === 'Points Table')
-    return mainGroups.length > 0 ? mainGroups : null
-  } catch (error) {
-    console.error('Cricbuzz standings failed:', error instanceof Error ? error.message : error)
-    return null
-  }
+    if (currentTeams.length > 0) groups.push({ group: currentGroupName, teams: currentTeams })
+    return groups.length > 0 ? groups : null
+  } catch { return null }
 }
 
-// ─── Matches ────────────────────────────────────────────────────────────────
-
-export async function scrapeMatches(): Promise<{ live: Match[], recent: Match[], upcoming: Match[] } | null> {
-  // Try ESPN API first, then Cricbuzz fallback
-  const espnResult = await fetchEspnMatches()
+export async function scrapeMatches(seriesId: string = DEFAULT_ESPN_ID, leagueSlug: string = DEFAULT_SLUG, cricbuzzSeriesId: string = DEFAULT_CB_ID): Promise<{ live: Match[], recent: Match[], upcoming: Match[] } | null> {
+  const espnResult = await fetchEspnMatches(seriesId, leagueSlug)
   if (espnResult) return espnResult
-
-  const cricbuzzResult = await fetchCricbuzzMatches()
-  if (cricbuzzResult) return cricbuzzResult
-
-  return null
+  return await fetchCricbuzzMatches(cricbuzzSeriesId, leagueSlug)
 }
 
-async function fetchEspnMatches(): Promise<{ live: Match[], recent: Match[], upcoming: Match[] } | null> {
+async function fetchEspnMatches(seriesId: string, leagueSlug: string): Promise<{ live: Match[], recent: Match[], upcoming: Match[] } | null> {
   try {
-    const url = `${ESPN_API}/v1/pages/matches/current?lang=en&latest=true`
-    const { data } = await axios.get(url, { headers, timeout: 15000 })
-
-    const live: Match[] = []
-    const recent: Match[] = []
-    const upcoming: Match[] = []
-
-    // The response contains matches array at top level or under content
+    const { data } = await axios.get(`${ESPN_API}/v1/pages/matches/current?lang=en&latest=true`, { headers, timeout: 15000 })
+    const live: Match[] = [], recent: Match[] = [], upcoming: Match[] = []
     const allMatches = data?.matches || data?.content?.matches || []
-    if (!Array.isArray(allMatches) || allMatches.length === 0) return null
-
-    // Filter to IPL matches only
-    const iplMatches = allMatches.filter((m: Record<string, unknown>) => {
-      const series = m.series as Record<string, unknown> | undefined
-      const seriesId = String(series?.objectId || series?.id || '')
-      const seriesSlug = String(series?.slug || '')
-      return seriesId === ESPN_SERIES_ID ||
-        seriesSlug.includes('indian-premier-league') ||
-        seriesSlug.includes('ipl')
+    const seriesMatches = allMatches.filter((m: any) => {
+      const s = m.series || {}; const sId = String(s.objectId || s.id || ''); const sSlug = String(s.slug || '').toLowerCase()
+      return sId === seriesId || sSlug.includes(leagueSlug.toLowerCase()) || (leagueSlug === 'indian-premier-league' && sSlug.includes('ipl'))
     })
-
-    if (iplMatches.length === 0) return null
-
-    for (const m of iplMatches) {
-      const match = (m.match || m) as Record<string, unknown>
-      const teams = (match.teams || []) as Record<string, unknown>[]
+    if (seriesMatches.length === 0) return null
+    for (const m of seriesMatches) {
+      const match = m.match || m; const teams = match.teams || []
       if (teams.length < 2) continue
-
-      const team1Info = (teams[0]?.team || teams[0]) as Record<string, unknown>
-      const team2Info = (teams[1]?.team || teams[1]) as Record<string, unknown>
-      const team1Name = String(team1Info?.longName || team1Info?.name || 'TBA')
-      const team2Name = String(team2Info?.longName || team2Info?.name || 'TBA')
-
+      const t1 = teams[0].team || teams[0]; const t2 = teams[1].team || teams[1]
       const state = String(match.state || m.state || '').toUpperCase()
       const stage = String(match.stage || m.stage || '').toUpperCase()
-      const statusText = String(match.statusText || m.statusText || '')
-      const matchTitle = String(match.title || m.title || '')
-      const groundInfo = (match.ground || m.ground || {}) as Record<string, unknown>
-      const townInfo = (groundInfo.town || groundInfo.city || {}) as Record<string, unknown>
-      const venue = groundInfo.name
-        ? `${groundInfo.name}${townInfo.name ? `, ${townInfo.name}` : ''}`
-        : matchTitle
-
-      const startTime = String(match.startTime || m.startTime || '')
-      const formattedTime = startTime ? formatMatchTime(startTime) : ''
-
-      // Determine status from ESPN state field
+      const statusText = match.statusText || ''
       let status: 'completed' | 'live' | 'upcoming'
-      if (state === 'LIVE' || stage === 'RUNNING') {
-        status = 'live'
-      } else if (state === 'POST' || state === 'FINISHED' || state === 'COMPLETE' || stage === 'FINISHED') {
-        status = 'completed'
-      } else if (state === 'PRE' || state === 'UPCOMING' || stage === 'SCHEDULED') {
-        status = 'upcoming'
-      } else {
-        status = parseStatus(statusText)
-      }
-
+      if (state === 'LIVE' || stage === 'RUNNING') status = 'live'
+      else if (state === 'POST' || state === 'FINISHED' || state === 'COMPLETE' || stage === 'FINISHED') status = 'completed'
+      else if (state === 'PRE' || state === 'UPCOMING' || stage === 'SCHEDULED') status = 'upcoming'
+      else status = parseStatus(statusText)
       const matchObj: Match = {
-        id: `espn-${String(match.objectId || match.id || Math.random())}`,
-        team1: team1Name,
-        team2: team2Name,
-        venue: String(venue),
-        time: formattedTime,
-        status,
+        id: `espn-${match.objectId || match.id}`, team1: t1.longName || t1.name, team2: t2.longName || t2.name,
+        venue: match.ground?.name || match.title || 'Unknown', time: match.startTime || '', status,
         result: status === 'completed' ? statusText : undefined,
       }
-
-      // Extract win probability if available (ESPN API often has it in liveScene or prediction)
-      const probData = (match.liveScene || match.prediction || m.prediction || match) as Record<string, any>
-      const winProb = probData.winProbability || probData.probability
-      if (winProb && typeof winProb === 'object') {
-        const team1Prob = winProb.team1Percentage || winProb.homeWinPercentage || winProb.team1
-        const team2Prob = winProb.team2Percentage || winProb.awayWinPercentage || winProb.team2
-        if (typeof team1Prob === 'number' && typeof team2Prob === 'number') {
-          matchObj.winProbability = {
-            team1: team1Prob,
-            team2: team2Prob,
-            source: 'ESPNCricinfo'
-          }
-        }
-      }
-
-      // Extract scores from innings data if available
-      const innings = (m.innings || match.innings || (m as Record<string, unknown>).scorecard || []) as Record<string, unknown>[]
-      if (Array.isArray(innings)) {
-        for (const inn of innings) {
-          const innTeam = (inn.team || {}) as Record<string, unknown>
-          const innTeamName = String(innTeam.longName || innTeam.name || '')
-          const runs = inn.runs ?? inn.score
-          const wickets = inn.wickets
-          const overs = inn.overs
-          if (runs !== undefined) {
-            const scoreStr = `${runs}/${wickets ?? '?'} (${overs ?? '?'})`
-            if (innTeamName === team1Name || String(innTeam.id) === String(team1Info.id)) {
-              matchObj.team1Score = scoreStr
-            } else if (innTeamName === team2Name || String(innTeam.id) === String(team2Info.id)) {
-              matchObj.team2Score = scoreStr
-            }
-          }
-        }
-      }
-
-      if (status === 'live' && live.length < 5) {
-        live.push(matchObj)
-      } else if (status === 'completed' && recent.length < 3) {
-        recent.push(matchObj)
-      } else if (status === 'upcoming' && upcoming.length < 6) {
-        upcoming.push(matchObj)
-      }
+      const prob = match.prediction?.winProbability || match.liveScene?.winProbability
+      if (prob) matchObj.winProbability = { team1: prob.team1Percentage || prob.homeWinPercentage, team2: prob.team2Percentage || prob.awayWinPercentage, source: 'ESPNCricinfo' }
+      if (status === 'live' && live.length < 5) live.push(matchObj)
+      else if (status === 'completed' && recent.length < 3) recent.push(matchObj)
+      else if (status === 'upcoming' && upcoming.length < 6) upcoming.push(matchObj)
     }
-
-    // Only consider it a success if we found at least one match
-    const total = live.length + recent.length + upcoming.length
-    return total > 0 ? { live, recent, upcoming } : null
-  } catch (error) {
-    console.error('ESPN matches failed:', error instanceof Error ? error.message : error)
-    return null
-  }
-}
-
-function formatMatchTime(isoTime: string): string {
-  try {
-    const date = new Date(isoTime)
-    return date.toLocaleString('en-IN', {
-      month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit',
-      timeZone: 'Asia/Kolkata',
-    }) + ' IST'
-  } catch {
-    return isoTime
-  }
-}
-
-async function fetchCricbuzzMatches(): Promise<{ live: Match[], recent: Match[], upcoming: Match[] } | null> {
-  try {
-    const url = `${CRICBUZZ_BASE}/cricket-series/${CRICBUZZ_SERIES_ID}/${CRICBUZZ_SERIES_SLUG}/matches`
-    const { data } = await axios.get(url, { headers, timeout: 15000 })
-
-    const $ = cheerio.load(data)
-    const live: Match[] = []
-    const recent: Match[] = []
-    const upcoming: Match[] = []
-    const seenMatchIds = new Set<string>()
-    const liveMatchUrls: { match: Match, href: string }[] = []
-
-    $('a[href*="/live-cricket-scores/"]').each((index, el) => {
-      const title = $(el).attr('title') || ''
-      const href = $(el).attr('href') || ''
-
-      // Deduplicate by match ID (numeric segment after /live-cricket-scores/)
-      const matchIdMatch = href.match(/\/live-cricket-scores\/(\d+)\//)
-      const matchId = matchIdMatch ? matchIdMatch[1] : href
-      if (seenMatchIds.has(matchId)) return
-      seenMatchIds.add(matchId)
-
-      if (!href.includes(CRICBUZZ_SERIES_SLUG) && !href.includes('ipl-2026') && !title.toLowerCase().includes('indian premier league')) {
-        return
-      }
-
-      const titleMatch = title.match(/^(.+?)\s+vs\s+(.+?),\s*(.+?)\s*-\s*(.+)$/)
-      if (!titleMatch) return
-
-      const [, team1, team2, matchInfo, statusText] = titleMatch
-      const status = parseStatus(statusText.trim())
-
-      const match: Match = {
-        id: `match-${index}`,
-        team1: team1.trim(),
-        team2: team2.trim(),
-        venue: matchInfo.trim(),
-        time: '',
-        status,
-        result: status === 'completed' ? statusText.trim() : undefined,
-      }
-
-      if (status === 'live') {
-        if (live.length < 5) {
-          live.push(match)
-          liveMatchUrls.push({ match, href })
-        }
-      } else if (status === 'completed') {
-        if (recent.length < 3) recent.push(match)
-      } else {
-        if (upcoming.length < 6) upcoming.push(match)
-      }
-    })
-
-    await Promise.all(liveMatchUrls.map(async ({ match, href }) => {
-      try {
-        const scores = await scrapeMatchScore(href)
-        if (scores) {
-          for (const { team, score } of scores) {
-            const expanded = expandTeamName(team)
-            if (expanded === match.team1 || team === match.team1) {
-              match.team1Score = score
-            } else if (expanded === match.team2 || team === match.team2) {
-              match.team2Score = score
-            }
-          }
-        }
-      } catch (e) {
-        console.error('Failed to fetch score for', href, e)
-      }
-    }))
-
     return { live, recent, upcoming }
-  } catch (error) {
-    console.error('Cricbuzz matches failed:', error instanceof Error ? error.message : error)
-    return null
-  }
+  } catch { return null }
 }
 
-// ─── Score scraping (Cricbuzz fallback) ─────────────────────────────────────
-
-export async function scrapeMatchScore(href: string): Promise<{ team: string, score: string }[] | null> {
+async function fetchCricbuzzMatches(seriesId: string, leagueSlug: string): Promise<{ live: Match[], recent: Match[], upcoming: Match[] } | null> {
   try {
-    const url = `${CRICBUZZ_BASE}${href}`
-    const { data } = await axios.get(url, { headers, timeout: 10000 })
-    const $ = cheerio.load(data)
-
-    const scores: { team: string, score: string }[] = []
-    const seen = new Set<string>()
-
-    $('div').each((_, el) => {
-      const text = $(el).text().trim().replace(/\s+/g, '')
-      const fullMatch = text.match(/^([A-Z]{2,4})(\d+)[-/](\d+)\((\d+\.?\d*)\)/)
-      if (fullMatch) {
-        const team = fullMatch[1]
-        const score = `${fullMatch[2]}/${fullMatch[3]} (${fullMatch[4]})`
-        const key = `${team}-${score}`
-        if (!seen.has(key)) {
-          seen.add(key)
-          scores.push({ team, score })
-        }
-      }
+    const { data } = await axios.get(`${CRICBUZZ_BASE}/cricket-series/${seriesId}/${leagueSlug}-2026/matches`, { headers, timeout: 15000 })
+    const $ = cheerio.load(data), live: Match[] = [], recent: Match[] = [], upcoming: Match[] = [], seen = new Set<string>()
+    const urls: { m: Match, h: string }[] = []
+    $('a[href*="/live-cricket-scores/"]').each((i, el) => {
+      const h = $(el).attr('href') || '', t = $(el).attr('title') || '', id = h.split('/')[2]
+      if (seen.has(id) || (!h.includes(leagueSlug) && !t.toLowerCase().includes('premier league'))) return
+      seen.add(id); const tm = t.match(/^(.+?)\s+vs\s+(.+?),\s*(.+?)\s*-\s*(.+)$/)
+      if (!tm) return
+      const s = parseStatus(tm[4]), m: Match = { id: `cb-${id}`, team1: tm[1].trim(), team2: tm[2].trim(), venue: tm[3].trim(), time: '', status: s, result: s === 'completed' ? tm[4].trim() : undefined }
+      if (s === 'live' && live.length < 5) { live.push(m); urls.push({ m, h }) }
+      else if (s === 'completed' && recent.length < 3) recent.push(m)
+      else if (s === 'upcoming' && upcoming.length < 6) upcoming.push(m)
     })
-
-    return scores.length > 0 ? scores : null
-  } catch (error) {
-    console.error('Failed to scrape match score:', error instanceof Error ? error.message : error)
-    return null
-  }
+    await Promise.all(urls.map(async ({ m, h }) => {
+      const scores = await scrapeMatchScore(h)
+      if (scores) scores.forEach(s => { const ex = expandTeamName(s.team); if (ex === m.team1 || s.team === m.team1) m.team1Score = s.score; else if (ex === m.team2 || s.team === m.team2) m.team2Score = s.score })
+    }))
+    return { live, recent, upcoming }
+  } catch { return null }
 }
 
-// ─── Utilities ──────────────────────────────────────────────────────────────
+export async function scrapeMatchScore(h: string): Promise<{ team: string, score: string }[] | null> {
+  try {
+    const { data } = await axios.get(`${CRICBUZZ_BASE}${h}`, { headers, timeout: 10000 })
+    const $ = cheerio.load(data), s: { team: string, score: string }[] = [], seen = new Set<string>()
+    $('div').each((_, el) => {
+      const t = $(el).text().trim().replace(/\s+/g, ''), m = t.match(/^([A-Z]{2,4})(\d+)[-/](\d+)\((\d+\.?\d*)\)/)
+      if (m) { const e = { team: m[1], score: `${m[2]}/${m[3]} (${m[4]})` }, k = `${e.team}-${e.score}`; if (!seen.has(k)) { seen.add(k); s.push(e) } }
+    })
+    return s.length > 0 ? s : null
+  } catch { return null }
+}
 
-export function parseStatus(text: string): 'completed' | 'live' | 'upcoming' {
-  const lower = text.toLowerCase()
-
-  if (lower.includes('toss')) return 'live'
-
-  if (lower.includes('won') || lower.includes('tied') || lower.includes('complete') ||
-      lower.includes('drawn') || lower.includes('no result') || lower.includes('abandoned') ||
-      lower.includes('cancelled') || lower.includes('beat') || lower.includes('defeated') ||
-      lower.includes('washed out') || lower.includes('washout') || lower.includes('forfeit') ||
-      lower.includes('awarded') || lower.includes('dls') || lower.includes('d/l') ||
-      /\bmatch over\b/.test(lower)) {
-    return 'completed'
-  }
-  if (lower.includes('live') || lower.includes('innings') || lower.includes('break') ||
-      lower.includes('opt to') || lower.includes('elected to') || lower.includes('batting') ||
-      lower.includes('bowling') || lower.includes('target') || lower.includes('need') ||
-      lower.includes('chose to') ||
-      /\d+[/-]\d+\s*\(/.test(lower)) {
-    return 'live'
-  }
+export function parseStatus(t: string): 'completed' | 'live' | 'upcoming' {
+  const l = t.toLowerCase()
+  if (l.includes('toss') || l.includes('opt to') || l.includes('elected to') || l.includes('chose to')) return 'live'
+  if (l.includes('won') || l.includes('tied') || l.includes('complete') || l.includes('drawn') || l.includes('no result') || l.includes('abandoned') || l.includes('beat') || l.includes('defeated') || l.includes('washed out') || l.includes('washout') || l.includes('forfeit') || l.includes('awarded') || l.includes('dls') || l.includes('d/l') || /\bmatch over\b/.test(l) || l.includes('cancelled')) return 'completed'
+  if (l.includes('live') || l.includes('innings') || l.includes('break') || l.includes('batting') || l.includes('bowling') || l.includes('target') || l.includes('need') || /\d+[/-]\d+\s*\(/.test(l)) return 'live'
   return 'upcoming'
 }
 
-export function expandTeamName(abbr: string): string {
-  const teams: Record<string, string> = {
-    'MI': 'Mumbai Indians',
-    'CSK': 'Chennai Super Kings',
-    'RCB': 'Royal Challengers Bengaluru',
-    'KKR': 'Kolkata Knight Riders',
-    'DC': 'Delhi Capitals',
-    'SRH': 'Sunrisers Hyderabad',
-    'RR': 'Rajasthan Royals',
-    'PBKS': 'Punjab Kings',
-    'LSG': 'Lucknow Super Giants',
-    'GT': 'Gujarat Titans',
-  }
-  return teams[abbr] || abbr
+export function expandTeamName(a: string): string {
+  const t: Record<string, string> = { 'MI': 'Mumbai Indians', 'CSK': 'Chennai Super Kings', 'RCB': 'Royal Challengers Bengaluru', 'KKR': 'Kolkata Knight Riders', 'DC': 'Delhi Capitals', 'SRH': 'Sunrisers Hyderabad', 'RR': 'Rajasthan Royals', 'PBKS': 'Punjab Kings', 'LSG': 'Lucknow Super Giants', 'GT': 'Gujarat Titans' }
+  return t[a] || a
 }
