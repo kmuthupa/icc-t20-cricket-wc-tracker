@@ -55,8 +55,17 @@ async function fetchEspnStandings(seriesId: string): Promise<GroupStandings[] | 
 
 async function fetchCricbuzzStandings(seriesId: string, leagueSlug: string): Promise<GroupStandings[] | null> {
   try {
-    const url = `${CRICBUZZ_BASE}/cricket-series/${seriesId}/${leagueSlug}-2026/points-table`
-    const { data } = await axios.get(url, { headers, timeout: 15000 })
+    let data
+    try {
+      const url = `${CRICBUZZ_BASE}/cricket-series/${seriesId}/${leagueSlug}-2026/points-table`
+      const res = await axios.get(url, { headers, timeout: 15000 })
+      data = res.data
+    } catch {
+      const url = `${CRICBUZZ_BASE}/cricket-series/${seriesId}/${leagueSlug}/points-table`
+      const res = await axios.get(url, { headers, timeout: 15000 })
+      data = res.data
+    }
+    
     const $ = cheerio.load(data), groups: GroupStandings[] = []
     let currentGroupName = 'Points Table', currentTeams: TeamStanding[] = []
 
@@ -65,49 +74,30 @@ async function fetchCricbuzzStandings(seriesId: string, leagueSlug: string): Pro
       
       if (text.startsWith('Group') || text.startsWith('Points Table')) {
         if (currentTeams.length > 0) groups.push({ group: currentGroupName, teams: currentTeams })
-        currentGroupName = text.split(/\s+/)[0] + (text.includes('Table') ? ' Table' : ' ' + text.split(/\s+/)[1])
+        currentGroupName = text.replace(/PWL.*$/, '').trim()
         currentTeams = []
         return
       }
 
       if (text.includes('PWL') || text.includes('NRPts') || text.includes('NRR')) return
 
-      // Robust extraction: normalize spaces and split
-      // Position is usually first, then Team name/abbr, then stats
-      const normalized = text.replace(/(\d+)([A-Z]{2,})/, '$1 $2') // "1MI" -> "1 MI"
-                            .replace(/([A-Z]{2,})(\d+)/, '$1 $2') // "MI10" -> "MI 10"
-                            .replace(/(\d+)([+-]\d+\.\d+)/, '$1 $2') // "10+1.20" -> "10 +1.20"
-                            .replace(/([+-]\d+\.\d+)(\d+)/, '$1 $2') // "+1.2010" -> "+1.20 10"
-
-      const parts = normalized.split(/\s+/)
-      if (parts.length >= 6) {
-        const pos = parseInt(parts[0])
-        if (isNaN(pos)) return
-
-        const team = expandTeamName(parts[1])
-        
-        // Find NRR (the float)
-        const nrrIdx = parts.findIndex(p => p.includes('.') && (p.includes('+') || p.includes('-') || p.match(/^\d/)))
-        const nrr = nrrIdx !== -1 ? parts[nrrIdx] : '0.000'
-        
-        // Identify numeric stats around NRR
-        // Common Cricbuzz order: P, W, L, NR, Pts, NRR  OR  P, W, L, NRR, Pts
-        // In the screenshot: P(2), W(3), L(4), NRR(5), PTS(6)
-        const played = parseInt(parts[2]) || 0
-        const won = parseInt(parts[3]) || 0
-        const lost = parseInt(parts[4]) || 0
-        
-        // If NRR is part 5, Pts is part 6
-        let points = 0
-        if (nrrIdx === 5) {
-          points = parseInt(parts[6]) || 0
-        } else {
-          // Fallback to searching for the highest numeric part remaining
-          points = parseInt(parts[parts.length - 1]) || 0
+      // Regex that works for: "1PBKS 861113+1.043", "1RCB 11002+1.850" (mock), and "1MI (Q)44008+2.500"
+      const match = text.match(/^(\d+)([A-Z]+)\s*(?:\([A-Z]\))?\s*(\d+)\s*([+-]?\d+\.\d+)$/)
+      if (match) {
+        const [, pos, team, stats, nrr] = match
+        let played = 0, won = 0, lost = 0, points = 0
+        if (stats.length >= 5) {
+          // stats is like 861113 or 11002
+          played = parseInt(stats[0]) || 0
+          won = parseInt(stats[1]) || 0
+          lost = parseInt(stats[2]) || 0
+          points = parseInt(stats.substring(stats.length - 2))
+          if (isNaN(points) || (stats.length === 5 && points > 20)) points = parseInt(stats[stats.length - 1]) || 0
         }
 
         currentTeams.push({
-          position: pos, team,
+          position: parseInt(pos),
+          team: expandTeamName(team),
           played, won, lost,
           nrr, points
         })
@@ -138,14 +128,21 @@ async function fetchEspnMatches(seriesId: string, leagueSlug: string): Promise<{
       const match = m.match || m; const teams = match.teams || []
       if (teams.length < 2) continue
       const t1 = teams[0].team || teams[0]; const t2 = teams[1].team || teams[1]
-      const status = parseStatus(match.statusText || '')
+      const statusText = match.statusText || match.state || match.stage || ''
+      const status = parseStatus(statusText)
       const matchObj: Match = {
-        id: `espn-${match.objectId || match.id}`, team1: t1.longName || t1.name, team2: t2.longName || t2.name,
+        id: `espn-${match.objectId || match.id || Math.random()}`, team1: t1.longName || t1.name || 'TBA', team2: t2.longName || t2.name || 'TBA',
         venue: match.ground?.name || match.title || 'Unknown', time: match.startTime || '', status,
-        result: status === 'completed' ? match.statusText : undefined,
+        result: status === 'completed' ? statusText : undefined,
       }
-      const prob = match.prediction?.winProbability || match.liveScene?.winProbability
-      if (prob) matchObj.winProbability = { team1: prob.team1Percentage || prob.homeWinPercentage, team2: prob.team2Percentage || prob.awayWinPercentage, source: 'ESPNCricinfo' }
+      const prob = match.prediction?.winProbability || match.liveScene?.winProbability || match.prediction || match.liveScene
+      if (prob) {
+        const t1p = prob.team1Percentage || prob.homeWinPercentage || prob.team1
+        const t2p = prob.team2Percentage || prob.awayWinPercentage || prob.team2
+        if (t1p !== undefined && t2p !== undefined) {
+          matchObj.winProbability = { team1: Number(t1p), team2: Number(t2p), source: 'ESPNCricinfo' }
+        }
+      }
       if (status === 'live' && live.length < 5) live.push(matchObj)
       else if (status === 'completed' && recent.length < 3) recent.push(matchObj)
       else if (status === 'upcoming' && upcoming.length < 6) upcoming.push(matchObj)
@@ -156,12 +153,21 @@ async function fetchEspnMatches(seriesId: string, leagueSlug: string): Promise<{
 
 async function fetchCricbuzzMatches(seriesId: string, leagueSlug: string): Promise<{ live: Match[], recent: Match[], upcoming: Match[] } | null> {
   try {
-    const { data } = await axios.get(`${CRICBUZZ_BASE}/cricket-series/${seriesId}/${leagueSlug}-2026/matches`, { headers, timeout: 15000 })
+    let data
+    try {
+      const url = `${CRICBUZZ_BASE}/cricket-series/${seriesId}/${leagueSlug}-2026/matches`
+      const res = await axios.get(url, { headers, timeout: 15000 })
+      data = res.data
+    } catch {
+      const url = `${CRICBUZZ_BASE}/cricket-series/${seriesId}/${leagueSlug}/matches`
+      const res = await axios.get(url, { headers, timeout: 15000 })
+      data = res.data
+    }
     const $ = cheerio.load(data), live: Match[] = [], recent: Match[] = [], upcoming: Match[] = [], seen = new Set<string>()
     const urls: { m: Match, h: string }[] = []
     $('a[href*="/live-cricket-scores/"]').each((i, el) => {
       const h = $(el).attr('href') || '', t = $(el).attr('title') || '', id = h.split('/')[2]
-      if (seen.has(id) || (!h.includes(leagueSlug) && !t.toLowerCase().includes('premier league'))) return
+      if (seen.has(id) || (!h.includes(leagueSlug) && !t.toLowerCase().includes('premier league') && !t.toLowerCase().includes('psl'))) return
       seen.add(id); const tm = t.match(/^(.+?)\s+vs\s+(.+?),\s*(.+?)\s*-\s*(.+)$/)
       if (!tm) return
       const s = parseStatus(tm[4]), m: Match = { id: `cb-${id}`, team1: tm[1].trim(), team2: tm[2].trim(), venue: tm[3].trim(), time: '', status: s, result: s === 'completed' ? tm[4].trim() : undefined }
